@@ -1,0 +1,67 @@
+# Copyright 2026 Marc Sullivan
+# SPDX-License-Identifier: Apache-2.0
+# Smritilila and its Postgres, as containers: `docker compose up -d`, then open http://127.0.0.1:8198 (see README.md).
+#
+#   docker compose up -d                        Postgres and Smritilila
+#   docker compose --profile ollama up -d       and a local model server (Ollama) beside them
+#   docker compose logs -f smritilila                what it is doing
+#   docker compose exec smritilila python scripts/serve.py check
+#
+# Settings come from `.env` (copy .env.example). The container's own database address is set below and wins over the file.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smritilila
+      POSTGRES_PASSWORD: smritilila   # a throwaway local login: choose your own before anything you care about goes in this database
+      POSTGRES_DB: smritilila
+    volumes:
+      - smritilila-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smritilila -d smritilila"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # not published: only Smritilila, on this compose network, reaches it. To reach it from the host, add `ports: ["127.0.0.1:5432:5432"]`.
+
+  smritilila:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://smritilila:smritilila@postgres:5432/smritilila
+      SMRITILILA_DATA_DIR: /data
+      SMRITILILA_HOST: 0.0.0.0
+      # Smritilila treats a request with no identity header as the OWNER's. Inside the container it must listen on every interface, so who can
+      # reach it is decided by the ports below, which are published on this machine only. Do not publish them on other addresses unless an
+      # authenticating proxy stands in front. See README.md, "Safety".
+      SMRITILILA_ALLOW_REMOTE: "1"
+    ports:
+      - "127.0.0.1:8198:8198"            # Smritilila
+      - "127.0.0.1:8200-8230:8200-8230"  # a world built from the page runs on a server of its own, on the next free port from 8200
+    volumes:
+      - smritilila-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # a model server on the host: SMRITILILA_LOCAL_BASE_URL=http://host.docker.internal:11434/v1
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    # a local model server, reached from Smritilila at SMRITILILA_LOCAL_BASE_URL=http://ollama:11434/v1. Pull a model once:
+    #   docker compose exec ollama ollama pull <model>
+    # For an NVIDIA GPU, add under this service:
+    #   deploy: {resources: {reservations: {devices: [{driver: nvidia, count: all, capabilities: [gpu]}]}}}
+
+volumes:
+  smritilila-pgdata:
+  smritilila-data:
+  ollama-models:

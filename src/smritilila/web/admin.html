@@ -1,0 +1,214 @@
+<!doctype html>
+<!-- Copyright 2026 Marc Sullivan. SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smritilila admin</title>
+<style>
+  :root { --bg: #14151a; --panel: #1c1e26; --border: #2c2f3a; --text: #e7e7ea; --muted: #8b8d98; --accent: #7c8cff; --ok: #7cc48a; --error: #e07a7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; display: flex; justify-content: center; min-height: 100vh; }
+  #app { width: 100%; max-width: 1000px; padding: 24px 20px 40px; }
+  h1 { font-size: 1.3rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; font-weight: 500; }
+  a { color: var(--accent); text-decoration: none; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .world { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin: 14px 0; }
+  .head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+  .head b { font-size: 1.05rem; }
+  .up { color: var(--ok); } .down { color: var(--error); }
+  .line { font-style: italic; color: var(--muted); margin: 6px 0 10px; font-size: 0.85rem; }
+  .guests { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+  .guests label { margin-right: 14px; cursor: pointer; }
+  textarea { width: 100%; margin-top: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: inherit; font-size: 0.85rem; }
+  button { background: var(--accent); color: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; margin-top: 8px; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .msg { margin-left: 10px; font-size: 0.85rem; }
+  .hidden { display: none; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+  nav button { margin-top: 0; background: transparent; color: var(--muted); border-color: var(--border); }
+  nav button.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  button.small { margin-top: 0; padding: 3px 10px; font-size: 0.85rem; }
+  button.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  input[type=text] { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit; width: 280px; max-width: 100%; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .row button { margin-top: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Smritilila admin</h1>
+  <p class="muted"><a href="/">&larr; back to the world</a> &middot; owner only &middot; changes are kept in worlds.json and every server reads them within a second, with no restart. Starting and stopping servers stays by hand.</p>
+  <nav>
+    <button id="tab-worlds" class="on">worlds</button>
+    <button id="tab-bots">activate bots</button>
+    <button id="tab-users">registered users</button>
+  </nav>
+  <section id="sec-worlds">
+    <p class="muted" id="always"></p>
+    <div id="worlds"><p class="muted">loading...</p></div>
+  </section>
+  <section id="sec-bots" class="hidden">
+    <p class="muted">A bot is an NPC played by an agent: each world offers the living beings richest in memory and the living beings most spoken of, such as a dragon met seldom, and the beings that matter to the world's story, such as its villains and powers (a model reads what each holds, and the names of the whole cast, to say which). A character people play is never offered, but you may add one by name, such as Dunstan. Switching one on makes it playable, logged off and waiting; it is then started by the bot supervisor (scripts/bots_supervisor.py, run on this machine) whenever a person is active in its world, and stopped when the last person leaves.</p>
+    <div id="bots"><p class="muted">loading...</p></div>
+  </section>
+  <section id="sec-users" class="hidden">
+    <p class="muted">Registered users. Adding one here does not let them through the login (Cloudflare Access names who may reach the site; that is its own step). A user with builder access may use the world builder, and is a god of the world they make.</p>
+    <div class="row"><input type="text" id="new-email" placeholder="email"><label><input type="checkbox" id="new-builder"> builder access</label><button id="add-user">add user</button><span class="msg" id="user-msg"></span></div>
+    <div id="users"></div>
+  </section>
+</div>
+<script>
+async function api(path, method, body) {
+  const opts = { method: method || "GET" };
+  if (body !== undefined) { opts.headers = { "Content-Type": "application/json" }; opts.body = JSON.stringify(body); }
+  const resp = await fetch(path, opts);
+  const text = await resp.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON body */ }
+  if (!resp.ok) throw new Error((data && data.detail) ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : (text || resp.statusText));
+  return data;
+}
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  for (const k of kids) e.append(k);
+  return e;
+}
+
+function worldCard(w, alwaysOpen) {
+  const status = w.up === null ? el("span", { className: "muted", textContent: "no server of its own" })
+    : w.up ? el("span", { className: "up", textContent: "up" + (w.online && w.online.length ? " - on now: " + w.online.join(", ") : " - nobody on") })
+    : el("span", { className: "down", textContent: "not answering" });
+  const head = el("div", { className: "head" }, el("b", { textContent: w.name }), el("span", { className: "muted", textContent: w.port ? "port " + w.port : "" }), status);
+  if (w.url) head.append(el("a", { href: w.url, target: "_blank", rel: "noopener", textContent: w.url.replace(/^https?:\/\//, "") }));
+  // to the world itself: its own address, or -- a private world with none yet -- its port on this machine
+  const target = w.url || (w.port ? "http://127.0.0.1:" + w.port + "/" : null);
+  if (target) { const open = el("button", { className: "small", textContent: "open", title: target }); open.addEventListener("click", () => { location.href = target; }); head.append(open); }
+  const card = el("div", { className: "world" }, head);
+  if (w.description) card.append(el("div", { className: "line", textContent: w.description }));
+  if (w.gods.length) card.append(el("div", { className: "muted", textContent: "gods: " + w.gods.join(", ") }));
+
+  const box = el("div", { className: "guests" });
+  const name = "mode-" + w.name;
+  const radios = {};
+  for (const [mode, label] of [["all", "any guest"], ["list", "only these emails"], ["none", "no guests"]]) {
+    const r = el("input", { type: "radio", name, value: mode, checked: w.guests.mode === mode });
+    radios[mode] = r;
+    box.append(el("label", {}, r, " " + label));
+  }
+  const emails = el("textarea", { rows: 3, placeholder: "one email per line", value: w.guests.emails.join("\n") });
+  const save = el("button", { textContent: "save" });
+  const msg = el("span", { className: "msg" });
+  const sync = () => emails.classList.toggle("hidden", !radios.list.checked);
+  Object.values(radios).forEach(r => r.addEventListener("change", sync));
+  sync();
+  if (w.open_to_all_by_server) box.append(el("div", { className: "muted", textContent: "this server also lists " + w.name + " as always open to guests (SMRITILILA_GUEST_WORLDS), whatever is set here." }));
+  save.addEventListener("click", async () => {
+    const mode = Object.keys(radios).find(m => radios[m].checked);
+    save.disabled = true; msg.textContent = ""; msg.className = "msg";
+    try {
+      await api("/admin/worlds/" + encodeURIComponent(w.name) + "/guests", "PUT", { mode, emails: emails.value.split(/[\s,;]+/).filter(Boolean) });
+      msg.textContent = "saved"; msg.classList.add("up");
+    } catch (e) { msg.textContent = e.message; msg.classList.add("down"); }
+    save.disabled = false;
+  });
+  box.append(emails, save, msg);
+  card.append(box);
+  return card;
+}
+
+async function load() {
+  const out = document.getElementById("worlds");
+  try {
+    const d = await api("/admin/worlds");
+    document.getElementById("always").textContent = d.always_open.length ? "Always open to guests on this server: " + d.always_open.join(", ") + "." : "";
+    out.replaceChildren(...d.worlds.map(w => worldCard(w, d.always_open)));
+  } catch (e) {
+    out.replaceChildren(el("p", { className: "down", textContent: "Could not load: " + e.message }));
+  }
+}
+load();
+
+// -- tabs
+const tabs = { worlds: "sec-worlds", bots: "sec-bots", users: "sec-users" };
+function showTab(name) {
+  for (const [t, sec] of Object.entries(tabs)) {
+    document.getElementById("tab-" + t).classList.toggle("on", t === name);
+    document.getElementById(sec).classList.toggle("hidden", t !== name);
+  }
+  if (name === "bots") loadBots();
+  if (name === "users") loadUsers();
+  if (name === "worlds") load();
+}
+for (const t of Object.keys(tabs)) document.getElementById("tab-" + t).addEventListener("click", () => showTab(t));
+
+// -- bots
+async function loadBots() {
+  const out = document.getElementById("bots");
+  try {
+    const d = await api("/admin/bots");
+    out.replaceChildren(...d.worlds.map(w => {
+      const card = el("div", { className: "world" }, el("div", { className: "head" }, el("b", { textContent: w.name }), el("span", { className: w.up ? "up" : "down", textContent: w.up ? "up" : "not answering" })));
+      if (w.warning) card.append(el("div", { className: "down", textContent: w.warning }));
+      if (w.up && !w.characters.length) card.append(el("div", { className: "muted", textContent: "No NPC in this world holds memories yet." }));
+      for (const c of w.characters) {
+        const state = el("span", { className: "msg" });
+        const b = el("button", { className: "small" + (c.bot ? "" : " ghost"), textContent: c.bot ? "active" : "off" });
+        b.addEventListener("click", async () => {
+          b.disabled = true; state.textContent = "";
+          try { await api("/admin/bots", "PUT", { world: w.name, entity_id: c.id, active: !c.bot }); c.bot = !c.bot; b.textContent = c.bot ? "active" : "off"; b.className = "small" + (c.bot ? "" : " ghost"); }
+          catch (e) { state.textContent = e.message; state.className = "msg down"; }
+          b.disabled = false;
+        });
+        card.append(el("div", { className: "row" }, b, el("span", { textContent: c.name }), el("span", { className: "muted", textContent: [c.important ? "important" : "", c.memories ? c.memories + " memories" : "", c.known_by ? "spoken of by " + c.known_by : ""].filter(Boolean).join(", ") }), state));
+      }
+      if (w.up && w.players.length) {
+        const pick = el("select", {}, el("option", { value: "", textContent: "add an existing character..." }), ...w.players.map(p => el("option", { value: p.id, textContent: p.name })));
+        const add = el("button", { className: "small ghost", textContent: "add as bot" }), note = el("span", { className: "msg" });
+        add.addEventListener("click", async () => {
+          const p = w.players.find(x => x.id === pick.value);
+          if (!p) return;
+          if (!confirm(p.name + " is a character people play. Make " + p.name + " a bot, played by an agent whenever a person is active in " + w.name + "?")) return;
+          try { await api("/admin/bots", "PUT", { world: w.name, entity_id: p.id, active: true, existing: true }); loadBots(); }
+          catch (e) { note.textContent = e.message; note.className = "msg down"; }
+        });
+        card.append(el("div", { className: "row" }, pick, add, note));
+      }
+      return card;
+    }));
+  } catch (e) { out.replaceChildren(el("p", { className: "down", textContent: "Could not load: " + e.message })); }
+}
+
+// -- users
+async function loadUsers() {
+  const out = document.getElementById("users");
+  try {
+    const d = await api("/admin/users");
+    if (!d.users.length) { out.replaceChildren(el("p", { className: "muted", textContent: "No registered users yet." })); return; }
+    const table = el("table", {}, el("tr", {}, el("th", { textContent: "email" }), el("th", { textContent: "added" }), el("th", { textContent: "world builder" }), el("th", {})));
+    for (const u of d.users) {
+      const toggle = el("button", { className: "small" + (u.builder ? "" : " ghost"), textContent: u.builder ? "enabled" : "disabled" });
+      toggle.addEventListener("click", async () => { try { await api("/admin/users/" + encodeURIComponent(u.email) + "/builder", "PUT", { builder: !u.builder }); loadUsers(); } catch (e) { alert(e.message); } });
+      const del = el("button", { className: "small ghost", textContent: "remove" });
+      del.addEventListener("click", async () => { if (!confirm("Remove " + u.email + " from the registered users?")) return; try { await api("/admin/users/" + encodeURIComponent(u.email), "DELETE"); loadUsers(); } catch (e) { alert(e.message); } });
+      table.append(el("tr", {}, el("td", { textContent: u.email }), el("td", { textContent: u.added }), el("td", {}, toggle), el("td", {}, del)));
+    }
+    out.replaceChildren(table);
+  } catch (e) { out.replaceChildren(el("p", { className: "down", textContent: "Could not load: " + e.message })); }
+}
+document.getElementById("add-user").addEventListener("click", async () => {
+  const msg = document.getElementById("user-msg"); msg.textContent = ""; msg.className = "msg";
+  try {
+    await api("/admin/users", "POST", { email: document.getElementById("new-email").value, builder: document.getElementById("new-builder").checked });
+    document.getElementById("new-email").value = ""; document.getElementById("new-builder").checked = false;
+    msg.textContent = "added"; msg.classList.add("up"); loadUsers();
+  } catch (e) { msg.textContent = e.message; msg.classList.add("down"); }
+});
+</script>
+</body>
+</html>

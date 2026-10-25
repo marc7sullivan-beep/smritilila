@@ -1,0 +1,4 @@
+# Files a Linux container reads must keep Unix line endings, whoever checks them out
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

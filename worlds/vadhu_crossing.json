@@ -1,0 +1,76 @@
+{
+  "name": "The Vadhū Crossing",
+  "setting": "A ferry crossing on the river Vadhū, late autumn. One inn on the east bank, a ferry, two landings, and a road on each side that leads off toward places nobody here has been. Nothing much happens at the crossing; everything that happens is remembered by someone.",
+  "scene_owner": "teo",
+  "playable": [
+    "teo"
+  ],
+  "entry_points": [
+    "east_landing"
+  ],
+  "places": {
+    "east_landing": {
+      "label": "the east landing",
+      "kind": "open",
+      "tuple": "A shelf of packed gravel on the east bank of the Vadhū where the ferry ties up: a mooring post black with age, the flat-bottomed ferry drawn half onto the stones, a coil of rope, and the river running grey and high from the autumn rains. Up the slope behind, the inn; along the bank to the south, the east road going off into the hills."
+    },
+    "the_inn": {
+      "label": "the inn at the crossing",
+      "kind": "building",
+      "tuple": "A low stone inn a stone's throw up from the east landing, its roof of split shakes gone green on the river side. One common room with a long hearth, a kitchen behind it, four sleeping rooms above reached by a ladder-stair, and a yard at the back with a woodpile and a goat. The door faces the river and is rarely shut."
+    },
+    "west_landing": {
+      "label": "the west landing",
+      "kind": "open",
+      "tuple": "The far bank: a mud shelf, a leaning mooring post, a bell on a stake that a traveler rings for the ferry, and the west road climbing away from the water between old willows. Nothing else. Whoever waits here waits in the open."
+    },
+    "east_road": {
+      "label": "the east road",
+      "kind": "road",
+      "tuple": "A cart road running south along the east bank from the landing and then turning up into the hills, rutted and puddled in autumn. It goes to the hill towns and beyond them; from the crossing you can see only its first mile."
+    },
+    "west_road": {
+      "label": "the west road",
+      "kind": "road",
+      "tuple": "The road west from the far landing, between willows and then out across the plain. Travelers come along it in ones and twos, more in spring than in autumn. From the crossing you can see a rider on it for a long time before he reaches the bell."
+    }
+  },
+  "people": {
+    "teo": {
+      "label": "Teo, the ferryman's apprentice",
+      "place": "east_landing",
+      "tuples": [
+        "I came to the crossing two winters ago with nothing but the clothes I stood in, and old Ilo took me on because his back had begun to go. I did not tell him where I came from and he did not ask. My name is Teo. I am not from here.",
+        "Ilo has taught me the pole and the rope and the reading of the water -- where the current sets hard after rain, where the shoal is in low summer. He has taught me one other thing, by saying it every day: watch the faces. Everyone who crosses will cross again, he says, or someone who knew them will. Remember them.",
+        "The rains have been heavy this week and the Vadhū is high and grey. Ilo says we will run the ferry today but not if it rises another hand. I am at the east landing at first light, coiling the rope, with the inn's smoke going up behind me and nobody yet at the bell on the far bank."
+      ]
+    },
+    "ilo": {
+      "label": "Ilo, the ferryman",
+      "place": "the_inn",
+      "tuples": [
+        "Forty years on this crossing. I have taken across soldiers going one way and coming back the other, brides, corpses, a bishop once, and more pedlars than there are stones in the river. I remember faces. I do not always remember names, and I have stopped pretending to.",
+        "The boy Teo is the third apprentice I have had and the first who might stay. The other two went off up the east road and I heard nothing after. This one watches the water the way it ought to be watched. He does not talk about where he came from, which is his business, and I have my own guess.",
+        "My back is bad this autumn. I sit by Marren's hearth in the mornings now and let the boy do the first crossings, and I tell myself it is to teach him. The river is high. There is a pedlar in the inn waiting for it to drop, a woman with a blue pack, and I know I have seen her before but not when."
+      ]
+    },
+    "marren": {
+      "label": "Marren, who keeps the inn",
+      "place": "the_inn",
+      "tuples": [
+        "My mother kept this inn and her mother before her, and none of us ever saw the sea, though the river goes there. Everyone who crosses eats here or sleeps here or at least stands in the door out of the rain, and I hear everything once and most things twice.",
+        "Ilo has eaten at my hearth every day of my life. He is the nearest thing to family I have left. The boy he took on is quiet and eats like a wolf and mends things without being asked, and I have decided to like him, which I do not do quickly.",
+        "The rains have kept the crossing slow this week. The pedlar with the blue pack has been three nights in the small room above the kitchen and pays in coin, which is rare; she asks questions about the hill towns and does not say why. I have the bread in and the goat is milked. Ilo is at the hearth already, complaining of his back."
+      ]
+    },
+    "sable": {
+      "label": "Sable, a pedlar with a blue pack",
+      "place": "the_inn",
+      "tuples": [
+        "I carry needles, thread, salt, three kinds of ribbon, a little pepper, and letters -- letters are the trade that pays; the rest is what people think I sell. I have walked the west road and the hill roads for eleven years. I cross the Vadhū twice a year and I make a point of not being remembered, which is harder than it sounds at a place with one inn.",
+        "I crossed here in spring. The old ferryman poled me over and looked at me a moment too long. I had a green cloak then. It is blue now, and the pack is new. I do not think the boy was on the ferry that day.",
+        "Three nights at the inn waiting for the water to drop. I have a letter for someone in the hill towns and I would rather not say to whom, and the innkeeper has begun to notice that I would rather not say. This morning the rain has stopped. If the ferry runs today I go east."
+      ]
+    }
+  }
+}

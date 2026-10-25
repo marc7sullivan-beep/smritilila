@@ -1,0 +1,68 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+.env.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# The witness's own record (smritilila.sakshi), one file per run -- real
+# player action text and narration, not source; opt-in via
+# SMRITILILA_SAKSHI_DIR, never committed.
+sakshi/
+
+# The conversations in which worlds were briefed (smritilila.routes.sthapati): the owner's own words, kept with the
+# world they made, never committed.
+builder_sessions/
+
+# Closed records (archive/README.md says what and why) -- real play
+# text, same as the live streams. The README itself IS committed, so
+# the space is documented even though its contents never are.
+archive/*
+!archive/README.md
+# superseded specs hold no play and stay committed
+!archive/specs/
+
+# Raw LoRA training-data capture (smritilila.training_data) -- full prompts/
+# completions from real play, not source; opt-in via
+# SMRITILILA_TRAINING_DATA_LOG, never committed.
+training_data.jsonl
+
+# Dev server console log (scripts/dev_server.py) -- teed stdout/stderr,
+# including live playthrough text in tracebacks; never committed.
+logs/
+
+# pg_dump backups of each registered world (smritilila.backup) -- save data,
+# not source; kept off this machine by its own backup,
+# not in the code backup repo.
+backups/
+.smritilila_active_world.*
+
+# judge runs: derived from training_data.jsonl, rebuilt by scripts/judge/
+experiments/
+invites.json
+
+# Pratiṣṭhā proposals (smritilila.routes.pratistha): a seed waiting for review may hold a secret -- never committed.
+proposals/
+
+# Maps a world's builder reads (smritilila.smrti.manacitra, routes/pratistha.py): someone's drawing, kept per world beside the proposals, never committed.
+maps/
+users.json
+
+# The life spike (notes/life.py): a first-person perceiver store -- it describes a home, never committed.
+life/

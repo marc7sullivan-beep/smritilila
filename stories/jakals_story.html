@@ -1,0 +1,1102 @@
+<!doctype html>
+<!-- Copyright 2026 Marc Sullivan. SPDX-License-Identifier: CC-BY-4.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Tale of Jakal Hierophant</title>
+<meta name="description" content="Jakal Hierophant's first four weeks in Hommlet, told from the Greyhawk world's own record.">
+<style>
+  :root {
+    --bg: #f6f1e7;
+    --paper: #fffdf8;
+    --ink: #2a2521;
+    --muted: #756a5d;
+    --accent: #8c3a1c;
+    --rule: #d8ccb8;
+    --jakal: #1d4f80;
+    --wash: #efe7d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15120f;
+      --paper: #1c1814;
+      --ink: #e8e0d2;
+      --muted: #a39786;
+      --accent: #e0905a;
+      --rule: #3a322a;
+      --jakal: #8dbaea;
+      --wash: #26211b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", serif;
+    font-size: 1.1rem;
+    line-height: 1.72;
+  }
+  main { max-width: 41rem; margin: 0 auto; padding: 0 16px 6rem; }
+  header.title { text-align: center; padding: 5rem 0 2.5rem; border-bottom: 1px solid var(--rule); }
+  header.title .kicker { letter-spacing: .22em; text-transform: uppercase; font-size: .78rem; color: var(--muted); margin: 0 0 1.4rem; }
+  header.title h1 { font-size: clamp(2.2rem, 7vw, 3.4rem); line-height: 1.1; margin: 0 0 .9rem; font-weight: 600; letter-spacing: .01em; }
+  header.title .sub { font-style: italic; color: var(--muted); margin: 0; font-size: 1.05rem; }
+  .epigraph { margin: 2.6rem auto 0; max-width: 31rem; font-style: italic; text-align: center; }
+  .epigraph footer { margin-top: .6rem; font-style: normal; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  nav.toc { margin: 2.2rem 0 0; padding: 1.2rem 1.4rem; background: var(--wash); border-radius: 6px; font-size: .95rem; line-height: 1.5; }
+  nav.toc h2 { font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; margin: 0 0 .7rem; color: var(--muted); font-weight: 600; }
+  nav.toc ol { margin: 0; padding-left: 1.4rem; }
+  nav.toc li { margin: .15rem 0; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  .foreword { margin-top: 2.4rem; font-size: 1rem; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 1rem; }
+  .foreword p { margin: .6rem 0; }
+  .foreword .j { color: var(--jakal); }
+  section.part { margin-top: 4.2rem; }
+  section.part h2 { font-size: clamp(1.5rem, 4.6vw, 2rem); line-height: 1.2; margin: 0 0 .25rem; font-weight: 600; }
+  section.part .when { font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 1.6rem; }
+  section.part .num { display: block; color: var(--accent); font-size: .78rem; letter-spacing: .26em; text-transform: uppercase; margin-bottom: .5rem; }
+  section.part > p:first-of-type::first-letter { float: left; font-size: 3.5em; line-height: .85; padding: .08em .09em 0 0; color: var(--accent); }
+  p { margin: 0 0 1.05rem; }
+  .j { color: var(--jakal); }
+  .sc { color: var(--ink); }
+  .break { text-align: center; color: var(--muted); letter-spacing: .5em; margin: 2rem 0; }
+  blockquote.said {
+    margin: 1.8rem 0;
+    padding: 1.1rem 1.3rem;
+    background: var(--paper);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    box-shadow: 0 1px 0 var(--rule);
+  }
+  blockquote.said p { margin: 0 0 .75rem; }
+  blockquote.said p:last-of-type { margin-bottom: 0; }
+  blockquote.said footer { margin-top: .8rem; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-style: normal; }
+  blockquote.said.jak { border-left-color: var(--jakal); }
+  blockquote.said.jak p { color: var(--jakal); }
+  .aside { font-size: .95rem; color: var(--muted); font-style: italic; }
+  dl.cast { display: grid; grid-template-columns: 1fr; gap: .15rem 1rem; font-size: .97rem; }
+  dl.cast dt { font-weight: 600; margin-top: .8rem; }
+  dl.cast dd { margin: 0; color: var(--muted); }
+  @media (min-width: 640px) {
+    dl.cast { grid-template-columns: 12.5rem 1fr; }
+    dl.cast dt { margin-top: 0; }
+  }
+  ul.threads { padding-left: 1.2rem; }
+  ul.threads li { margin-bottom: .7rem; }
+  footer.colophon { margin-top: 4rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: .92rem; color: var(--muted); }
+  footer.colophon h2 { font-size: .85rem; letter-spacing: .2em; text-transform: uppercase; margin: 0 0 .8rem; }
+  @media print {
+    :root { --bg: #fff; --paper: #fff; --ink: #000; --muted: #444; --accent: #6b2a12; --jakal: #123a63; --wash: #f2f2f2; --rule: #bbb; }
+    header.title { padding-top: 0; }
+    nav.toc { display: none; }
+    section.part { break-before: page; }
+    blockquote.said { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="title">
+  <p class="kicker">From the record of Greyhawk</p>
+  <h1>The Tale of Jakal Hierophant</h1>
+  <p class="sub">Hommlet, the moathouse, and the long road to a book that would not hold together<br>26 September – 22 October 2026</p>
+  <blockquote class="epigraph">
+    <p>“There is magic in the world yet undiscovered. You and I will find and bring to life the magic hidden in the world. This I swear to you by the seven sisters.”</p>
+    <footer>Jakal Hierophant, to Spugnoir of Dyvers</footer>
+  </blockquote>
+</header>
+
+<nav class="toc" aria-label="Parts">
+  <h2>The parts of the tale</h2>
+  <ol>
+    <li><a href="#p1">A Scholar at the Welcome Wench</a></li>
+    <li><a href="#p2">The Moathouse, First Blood</a></li>
+    <li><a href="#p3">The Seven Sisters</a></li>
+    <li><a href="#p4">Down the Culvert</a></li>
+    <li><a href="#p5">The Black Doors</a></li>
+    <li><a href="#p6">The Bravest Soul</a></li>
+    <li><a href="#p7">An Oak, a Ditch and a Fever</a></li>
+    <li><a href="#p8">The Lord of All Magics</a></li>
+    <li><a href="#p9">The Recruit</a></li>
+    <li><a href="#end">Where Things Stand</a></li>
+  </ol>
+</nav>
+
+<div class="foreword">
+  <p><strong>How to read this.</strong> Jakal Hierophant is a character in the Greyhawk world, played at the keyboard by Marc. This is his story so far, built from what the world itself kept: Jakal’s own memories, the memories of the people who met him, and the log of every prompt and every answer the narrator gave him.</p>
+  <p>Words set <span class="j">in blue</span> are Jakal’s: what Marc typed for him, with capitals and spelling mended (and, once or twice, a garbled clause straightened), or what the narrator made of it in the moment. Every other quoted line is spoken by the person named, exactly as the record has it. Each part is headed by the world’s own count of days, the narrator’s clock, followed by the date Marc played it (UTC); the two do not run alike, because the world’s clock turns on its players’ turns. I used only what Jakal himself saw, heard and remembered, and nobody else’s private memory. What I added is the weather of the telling: no event here is invented, and nobody says anything they did not say.</p>
+</div>
+
+<!-- ============================ PART ONE ============================ -->
+<section class="part" id="p1">
+  <h2><span class="num">Part One</span>A Scholar at the Welcome Wench</h2>
+  <p class="when">World days 1–2 · played 26 September</p>
+
+  <p>He came in at the tail of the evening, slight of frame and tall in dark green robes, with a wooden staff in one hand, a dagger at his belt and a set of balanced throwing darts at his hip. In his own first account of himself he was <span class="j">“freshly graduated, schooled in the rudiments of arcane casting and basic healing rites, driven by an eager curiosity to uncover nature’s herbal lore and expand my knowledge.”</span> He had walked into Hommlet with a head full of theory and a purse of modest weight.</p>
+
+  <p>The Welcome Wench was loud with mutton and pipe smoke. At the oak counter a burly man with forearms like rolled hams was drying a pewter tankard. Jakal went straight up to him.</p>
+
+  <blockquote class="said jak">
+    <p>I go up to the bar and introduce myself to the bartender. I’d like a mug of ale and whatever food they serve here. I engage the bartender in small talk to see what’s going on in Hommlet.</p>
+    <footer>Marc, as Jakal — the first thing he ever did</footer>
+  </blockquote>
+
+  <p>The innkeeper gave his name as Ostler Gundigoot, set down dark ale and a trencher of roast fowl, and rested his forearms on the counter. <span class="sc">“A warm welcome to you, Master Jakal.”</span> The village was peaceful enough, he said, under the eye of Canon Terjon, with Lord Burne’s new stone keep rising on the eastern ridge, <span class="sc">“yet a few too many armed wanderers have drifted in lately, asking after the ruined moathouse out in the marshes.”</span></p>
+
+  <p>A tipsy woodcutter had swayed up to the counter beside him. <span class="sc">“Elmo’s the name, Elmo Thistlewood,”</span> he said. <span class="sc">“I fell trees for whoever pays an’ drink what’s left over.”</span> Jakal answered cagily.</p>
+
+  <blockquote class="said jak">
+    <p>Jakal’s my name, and I might be — I might be just passing through. What of the old ruins?</p>
+  </blockquote>
+
+  <p>Elmo leaned in, grinning lopsidedly, and dropped his voice. <span class="sc">“That old moathouse down the east track? Nasty place, scholar, full of bog vermin and cellar creepers.”</span> Giant frogs lurked in the moat weeds, he said, and bad sorts had been seen sniffing round the tumbled walls after dark. <span class="sc">“Ain’t no place to wander alone unless you’ve got stout steel beside you, or someone who knows where the sinkholes hide.”</span> He swayed as he said it, though his gaze stayed steady on Jakal’s staff.</p>
+
+  <p>Across the room a lean young man in a scholar’s collar had looked up sharply from his cup at the word <em>ruins</em>. In a corner a dark, narrow-eyed man named Turuko exchanged a glance with his armoured companion Kobort. Ostler went on drying his tankard and quietly shook his head.</p>
+
+  <p>The young man was Spugnoir of Dyvers, a journeyman arcanist with ink-stained fingers. By the end of the night he and Jakal had shaken hands on the only terms either of them could afford to offer: they would split all coin equally, and share and copy any magical scroll or grimoire they found. Jakal told him what he knew. <span class="j">“I share with Spug what spells I know,”</span> Marc wrote, and Spugnoir, hearing a first-circle repertoire that began with Sleep and Magic Missile, pronounced it <span class="sc">“a balanced foundation.”</span> Sleep wanted sand and rose petals. Two spells a day, and a few restorative rites besides, was all the novice could carry.</p>
+
+  <p>Ostler, leaning over the bar, had already quietly warned them not to hire anyone tonight on ale and a handshake, and to ask at the church or the keep first. Spugnoir’s plan answered it, and he gave it in an undertone across the counter: <span class="sc">“Gundigoot speaks sense. Master Burne at the stone keep is an accomplished mage of great standing — an introduction there might grant us valuable counsel, if not access to deeper arcane lore. And the Cuthbertines at the church know what foul things linger in the fen. I propose we secure a room for the night, rest our minds, and visit the tower and the church at first light before we commit to any company.”</span> Jakal took the heavy iron key to the upstairs room.</p>
+
+  <p>In the morning the same two men were at the hearth, watching. <span class="j">“Those two watching us last night and at breakfast,”</span> Jakal told Spugnoir on the road, <span class="j">“seem rather shady.”</span> It was the first thing he said about Turuko and Kobort, and all month he would turn out to be right about them.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>The keep gate was shut to everyone until noon, so they went to the church. On its knoll the Church of St. Cuthbert smelled of tallow and old stone, and a young acolyte named Calmert greeted them as <em>two mages</em> come looking for <em>the Cudgel</em>, which is what the faithful call their saint. Jakal paid twenty-five gold pieces into the offering bowl for a crystal vial of holy water. Canon Terjon spoke up from the chancel, telling them to go with honest steel and not idlers from the taproom, and to come back and report what they saw. Then Jakal did something that set the shape of a good half of his month. He asked for company.</p>
+
+  <blockquote class="said jak">
+    <p>I give a donation for the holy water. Would any of your acolytes be willing to accompany us as representatives of the faith?</p>
+  </blockquote>
+
+  <p>Calmert glanced back toward the chancel. From the shadows Canon Terjon, arms folded, gave a firm, measured nod. <span class="sc">“With the Canon’s permission,”</span> said Calmert, one hand on the pommel of his mace, <span class="sc">“I would willingly accompany you to root out whatever filth festers in the fens, provided the Cudgel receives a full share of any recovered spoils and an honest accounting of deeds.”</span></p>
+
+  <p>“It is a blessing just to have you with us, Calmert,” Jakal said. <span class="j">“Now let us find ourselves a good sword arm.”</span></p>
+
+  <p>The Canon had a suggestion for that. Brother Smyth at the smithy on the mill road, he said, <span class="sc">“is a faithful son of the Cudgel. He knows every strong arm in this village and which of them can be trusted.”</span> Smyth turned out to be a sooty, sensible man who offered to close up the worn left shoulder of Calmert’s chain mail while they shopped. Jakal asked, hopefully, whether he and Spugnoir might use any of the armour on the racks.</p>
+
+  <p><span class="sc">“A wizard in plate,”</span> said Smyth, <span class="sc">“is a drowned dog in a pond.”</span></p>
+
+  <p>The swords and shields would only spoil their dweomers and trip their feet, the smith explained, but cold iron spikes, a prying bar, a pair of balanced throwing knives — those weighed little and served any man in a tight cellar. Jakal paid seven gold for two throwing knives, ten spikes and a crowbar; Spugnoir, who by his own cheerful admission was <span class="sc">“a poor mule,”</span> took the knives and spikes and left the bar for Calmert. Smyth, who had already let slip that the tipsy woodcutter only played the drunkard, and had an honest arm and a deep knowledge of the fens, set Jakal right on the name. Jakal had half-remembered it as Otto. <span class="sc">“Elmo’s the name you’re looking for, not Otto.”</span></p>
+
+  <p>They found him nursing small beer at the Wench, and he dropped the act in a whisper. He had put on the sot for the room, he said; his terms were an equal share, food and ale, and the last word on turning back. He asked them to keep quiet until the road. Jakal agreed to all of it and named a place and an hour. <span class="j">“Let’s meet at the east track tomorrow at sunrise,”</span> he said. <span class="sc">“Dawn, then,”</span> said Elmo. <span class="sc">“Now go, before the whole room hears you.”</span></p>
+
+  <p>At noon the guard Oswin Hale let them into the stone tower. Master Burne and his captain, Rufus, received them in a study with drafting tables, and Burne said what mages say. He would trade spells with the young scholars, but only for lost dweomers recovered from the ruin, or proof of who led the brigands there. He warned them of the old Temple cultists who had first built the place. Rufus, more practically, offered a bounty of twenty gold for intelligence on the moathouse’s occupants.</p>
+
+  <p>At midday, over stew, Jakal and Spugnoir reviewed their gear and their spells. Later, upstairs, Jakal decided what to do about the men at the hearth, who had watched every move he made. <span class="j">“Tomorrow we need to leave quietly and unseen through a back door,”</span> he told Spugnoir. <span class="j">“Those lowlifes downstairs are watching us way too closely.”</span> Before dawn he gathered their supplies, left the room key on the washstand, and led his partner down the back stairs and out through the kitchen postern into the mist.</p>
+
+  <p>On the east track, in the grey, Calmert and Elmo were waiting. Jakal asked each of them to name what they could do. <span class="j">“I share my spells,”</span> he said, <span class="j">“and ask each of the others to declare their skills so we all know each other’s capabilities.”</span> It was, in miniature, a habit he kept: he wanted everyone to know who they were to each other.</p>
+</section>
+
+<!-- ============================ PART TWO ============================ -->
+<section class="part" id="p2">
+  <h2><span class="num">Part Two</span>The Moathouse, First Blood</h2>
+  <p class="when">World day 3 · played 26–27 September</p>
+
+  <p>The moat was scummed and stinking. Bubbles rose near the far bank, and for a moment two huge pale eyes surfaced and sank again. Jakal had been told about the frogs.</p>
+
+  <p>Elmo had set the order: himself ahead, then Calmert with his painted shield, then the two mages. Jakal looked at the black water and made his first tactical suggestion, which was to stop pretending it was not there. <span class="j">“Should we draw them out? I don’t like them staying in the water. Better to deal with them now, I say.”</span></p>
+
+  <p><span class="sc">“Aye,”</span> said Elmo. <span class="sc">“Better on the stones than under ’em.”</span></p>
+
+  <p>Calmert baited the nearer frog with the Cudgel painted on his shield, and the water erupted. Jakal, staying behind and to the side of the woodsman, threw dart after dart. One took a frog in the throat. <span class="sc">“Keep back from the gullet!”</span> Elmo shouted. A second dart glanced off the ridge of a skull. When the creature came up the bank Jakal closed and cracked its skull with his staff, shouting for Spugnoir to help, and Elmo finished it with the axe.</p>
+
+  <p>Inside the courtyard they stopped. <span class="j">“Let’s proceed carefully,”</span> Jakal said. <span class="j">“I’ve heard there’s brigands holed up here, and their eyes could be on us right now. Not to mention all kinds of other nasty creatures.”</span> Elmo agreed in his own way. Drawing them out would only give their archers the yard to shoot across. <span class="sc">“Better we slip inside the shadows of the great hall first. Catch ’em while they’re still eating mutton.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>The great hall had lost half its roof. Fallen timbers lay across cracked flagstones, and in the dim light by an iron brazier three men in leather armour sat at their ease. Two tossed dice across a barrel top. The third, by a pillar, was working a bowstring onto its notch. Behind a heap of masonry, four adventurers crouched and breathed.</p>
+
+  <p>Jakal could put all three to sleep, but it would spend one of the two spells he could cast in a day. He whispered it to the others. <span class="j">“I could sleep them all, but that uses one of my two spells per day. Thoughts?”</span></p>
+
+  <p>Elmo did not look away from the brazier. <span class="sc">“Three men asleep can’t shoot back. Spend it. The day’s long, but it’s longer with an arrow in you.”</span></p>
+
+  <p>Calmert nodded once behind his shield. <span class="sc">“Put them down and we’ll bind them. Sleeping men can still answer the Captain’s questions.”</span></p>
+
+  <p>Spugnoir touched his sleeve. <span class="sc">“I’ll keep Burning Hands back for whatever’s below. You’ll still have your Missile.”</span></p>
+
+  <p>Across the hall the bowman’s string finally caught the notch. He tested the pull, and reached for the quiver at his hip. Jakal rose, spoke the incantation, and scattered sand and rose petals toward the brazier. The magic took hold at once. The bowman folded where he stood, and the two dicers sagged over their barrel as though someone had cut their strings. Nobody had to draw a blade. They tied the sleepers with cord, stripped them of daggers, bow and coin, and went on.</p>
+
+  <p>In a webbed chamber to the north a giant spider hung in the ceiling silk. Jakal raised his hands, spoke the words of power, and sent a dart of blue-white force streaking over Calmert’s shoulder. It struck the creature squarely between its clustered eyes with a crack like breaking slate, and tore it down onto the flagstones. <span class="sc">“Clean strike, scholar,”</span> Elmo muttered, resting his axe head against his knee. Jakal felt the last of his arcane strength go out of him. The two spells he had been granted for the day were spent, and it was not yet noon.</p>
+
+  <p>He searched a cocoon and found a dead man in it, and a purse: a dozen gold pieces, some silver, and an unlabelled clay vial that sloshed. His herb training told him what the smell meant. <span class="j">“The sharp bitterwort and snakeroot aroma,”</span> he wrote in his own memory, <span class="j">“confirmed it is an herbal antidote against poison.”</span> Elmo, who had seen the spider’s work, approved. <span class="sc">“That’ll keep a man breathing if another one of those creeping crawlers bites.”</span> Calmert said a word to St. Cuthbert for the dead man in the silk.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>Then they went down. The cellar corridor was wet and quiet. A barred door on the west side was left alone; Elmo whispered that nothing was moving behind it but that it stank of the grave. In a pillared storeroom, three dog-sized rats launched from the mouldering sacks, and Jakal, retreating half a pace into the shadow of a pillar, gave his first orders in a fight.</p>
+
+  <blockquote class="said jak">
+    <p>Darts and daggers, Spug — hit ’em! We hang back to give the fighter and cleric room.</p>
+  </blockquote>
+
+  <p>Calmert caught the first on his shield and split its skull with a downward blow of his mace. Elmo’s handaxe cleaved the second in mid-leap. Jakal snapped his wrist and an iron dart went through the third rat’s flank, and Spugnoir’s thrown knife pinned its neck to the stone. Afterward, when it was quiet, a rat’s bite on his thumb began to throb. He bound it with a strip of his robe hem, and on the plinth of a pillar he beat a bent dart straight. <span class="j">“This is the only dart I have left,”</span> he said. <span class="sc">“Your yelp carried,”</span> said Elmo, <span class="sc">“Quick about it.”</span></p>
+
+  <p>The gnolls came at a choke point in a stone passage, with a torch wedged behind the company. A dog-muzzled brute with a spear barked once and fled howling, and something deeper in the dark howled back. Jakal set Calmert at the bend, Elmo behind his shoulder, Spugnoir beside himself, and reached for the Magic Missile he had spent on a spider.</p>
+
+  <p>It was gone. His account is plain about this: <span class="j">“I drew my last straightened iron dart from my belt and took aim past Calmert’s shoulder.”</span> It took the axe-gnoll in the throat. When a second gnoll thrust its spear past the scrum, <span class="j">“I deflected the iron point with my staff into the stone wall.”</span> Pinned against Calmert’s shield, a third snarled, and Jakal, fighting hand to hand for the first time against gnolls, <span class="j">“leaned over Calmert’s shoulder and drove my belt dagger into the pinned gnoll’s neck.”</span> The last one cut Calmert’s shin and fled.</p>
+
+  <p><span class="sc">“It’s gone to fetch the rest,”</span> Elmo said.</p>
+
+  <blockquote class="said jak">
+    <p>Let’s retreat quickly. Back to where we left the brigands tied up. Back to the hall — move!</p>
+  </blockquote>
+
+  <p>He healed Calmert’s shin on the way, woke the bound brigands, and marched them up into the light and down to Hommlet for justice. It was a respectable first descent: three sleeping brigands and a cocoon’s purse, bought with two spells and a bent dart. But the keep’s captain was not impressed. Rufus, <span class="j">“deeming our intelligence incomplete due to our hasty retreat,”</span> paid a reduced bounty of fifteen gold instead of twenty and cautioned that the moathouse remained dangerous. Jakal saw the strain in the company on the way back down to the village, and set it down in his own account: <span class="j">“My magic had been exhausted in the cellars, leaving us vulnerable when the gnolls pressed in.”</span> It was the first lesson the moathouse had for him. He would be taught it again.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>On the village green, under the weeping willow, a road-dusty sellsword with a round shield and an arming sword crossed the grass to the company and offered his blade. His name was Dunstan Mere. Jakal had one thing to give him, and gave it plainly.</p>
+
+  <blockquote class="said jak">
+    <p>We will split all the treasure equally. That is all we can offer, sir. Is that acceptable?</p>
+  </blockquote>
+
+  <p>Dunstan took the terms, and the company under the willow said again what it had already agreed. Elmo took a grass stem out of his mouth: <span class="sc">“Equal shares was my price from the start, and I’ll hold to it.”</span> Calmert laid a hand on his shield. <span class="sc">“The church asks no more than its share. Equal it is.”</span> Spugnoir smiled. <span class="sc">“It was agreed before. It’s agreed again.”</span> For the first time since the cellars, the narrator wrote, they seemed easy together. The company was five.</p>
+
+  <p>There was one more small thing before noon, and it is worth keeping. Jakal had it fixed in his head that Spugnoir had lost the vial of holy water. He said so, with some firmness, and proposed that they go and look for it in their room at the Wench. Spugnoir, who was a patient man, opened his satchel and took the vial out. It had been there all morning. Ostler, meanwhile, had let their upper chamber to the Wild Coast sellsword Zert and charged them fresh silver for a cramped back room over the kitchen, and that is where the next part of the story begins.</p>
+</section>
+
+<!-- ============================ PART THREE ============================ -->
+<section class="part" id="p3">
+  <h2><span class="num">Part Three</span>The Seven Sisters</h2>
+  <p class="when">World days 3–5 · played 27–28 September</p>
+
+  <p>The back room over the kitchen was hot and it stank of grease. The shutter had swollen shut. The bolt on the door hung from a single screw. Jakal, who had already come back to find his first room let to someone else, jammed an iron spike under the warped door to wedge it fast, and balanced a tin cup and a loose nail on the latch for an alarm. Then he sat down at the table, took out his last scarred dart, and turned it over in his fingers, thinking of the one that had gone into a gnoll’s throat.</p>
+
+  <p>It was a scarred, bent thing. He suspected there was something in it.</p>
+
+  <blockquote class="said jak">
+    <p>I need to recover that dart I stuck in the gnoll’s throat. It’s a special dart, one I suspect has latent magic in it that just needs to be awakened. What do you think, Spug?</p>
+  </blockquote>
+
+  <p>Spugnoir set down his quill and said what a friend would say. <span class="sc">“A dart forged of common iron does not grow an enchantment simply by finding a throat, Jakal.”</span></p>
+
+  <p>The noon heat pressed through the floor. Downstairs pans clattered. And Jakal, who had been taught what every apprentice is taught, said the thing that the rest of this story leans on.</p>
+
+  <blockquote class="said jak">
+    <p>Yes, that is what we have been taught, isn’t it, Spug. Perhaps our teachings are the limits of current understanding. There is magic in the world yet undiscovered. You and I will find and bring to life the magic hidden in the world. This I swear to you by the seven sisters.</p>
+    <footer>Marc, as Jakal, 27 September</footer>
+  </blockquote>
+
+  <p>Spugnoir was quiet for a moment. Then he smiled, a little embarrassed, reached across the grease-stained table and gripped Jakal’s wrist.</p>
+
+  <blockquote class="said">
+    <p>“I don’t know your seven sisters, Jakal, but I’ll hold you to the oath all the same. We find it together, and we write it down properly. And we do it alive, not over scrap iron.”</p>
+    <footer>Spugnoir of Dyvers</footer>
+  </blockquote>
+
+  <p>He let go and went back to his notes, still smiling. The record never says what the seven sisters are. It does say that the oath was made once, in a hot room, between two young men with little magic to speak of, and that twenty-two days later by the world’s count, in a library in Verbobonc, one of the first questions Jakal put to a teacher was how new spells are made.</p>
+
+  <p>The afternoon went to the matter at hand. <span class="j">“Perhaps there is another way into their lair,”</span> Jakal said. <span class="j">“I agree the frontal assault would end badly for us all.”</span> Spugnoir had been thinking along the same lines. Water had been trickling in that cellar corridor. <span class="sc">“Water that comes into a cellar has to leave it somewhere,”</span> he said, <span class="sc">“and in a moathouse sunk in the fens that means a drain, or a culvert out to the marsh. And Burne said the Temple folk built the place. Men like that never dug a cellar without a bolt-hole.”</span> Elmo knew those fens better than anyone.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>Dunstan was late to the east road at dawn. Elmo was missing altogether, until he stepped out of a hawthorn hedge, explaining that he had been scouting it to be sure nobody from the taproom had followed them. Jakal greeted the sellsword with relief: <span class="j">“We were worried those ruffians had waylaid you.”</span> He told the company that valiant friends were journeying toward Hommlet and would reach it by evening, and Elmo welcomed the thought. <span class="sc">“More steel will make short work of those dog-faced brutes in the cellars,”</span> he said. <span class="sc">“We can scout the fen for the old drain culvert today, mark the way, and fall back to the taproom to meet your folk before nightfall.”</span> Spugnoir agreed that mapping the runoff now would prepare them for a decisive assault once their allies came. So the plan for the day was a small one. They would look for the culvert, and go home.</p>
+
+  <p>On the march east Dunstan told Jakal that he would take the front beside Elmo at the moathouse and keep the fire and oil behind him. Jakal searched the ditches and hedge-banks as they walked, and cut comfrey and yarrow for wounds, a fistful of feverfew, and under a hawthorn root a rare clump of silver-leaved woundwort, which his herbal masters valued above the rest for closing cuts. Where the cart track dissolved into fenland mire he crushed the woundwort between two flat stones into a fragrant paste and folded it into a clean linen poultice. Dunstan asked Elmo about sentries, and Elmo warned them of lookouts on the high stone and of marsh beasts along the causeway.</p>
+
+  <p>At the moathouse the upper parapets looked empty. Dunstan drew his blade, saw giant frogs wallowing sluggishly in the scummy water beside the causeway, and warned the company to keep close. Jakal stayed behind the front rank with his staff, with Calmert and Spugnoir beside him, watching the moat for any stirring. Nothing stirred. But at the gate arch Dunstan accidentally kicked loose a piece of mortar, and froze against the stone, and from inside the moathouse came a distant scrape of iron and a muffled snarl. He raised his fist to halt the file and whispered back a warning. Jakal readied his staff and signalled to Spugnoir, and the wood clacked against a loose flag underfoot. Ahead, Dunstan peered around the arch. Across the weeds, in the shadow of the great hall doorway, a gnoll sentry stood with a poleaxe.</p>
+
+  <p>Jakal whispered to Elmo, asking whether he could take out the gnome quietly. Elmo corrected him: it was a gnoll, and he could, if it kept its snout up. His arrow took the creature under the jaw and it dropped without a sound. But its poleaxe clanged on the step, and something in the dark hall growled and began to stir.</p>
+
+  <p>Jakal warned the company that something was coming and called for everyone to take positions and wait for it. Dunstan stepped to the arch with an oil flask ready, and Calmert braced with his shield. Across the courtyard two gnolls ducked behind the hall pillars, and an arrow zipped across the weeds to splinter on the gate stone beside Dunstan. Jakal stepped to the gate opening and wove his Sleep across the yard toward the hall doorway. It took the gnoll behind the left pillar and dropped it into the briars; the second beast resisted the fringe of the spell and cried out an alarm. Dunstan warned of the killing ground of open yard. Elmo told of a briar-choked breach in the east wall. From deep inside the ruins came the sound of running feet.</p>
+
+  <p>Two more gnolls with spears charged out of the hall. Dunstan smashed a flask of lamp oil across their path, ten paces out on the flagstones, and roared for the wizard to bring fire. Jakal had an iron dart in his hand, and loosed it past Dunstan’s shoulder into the lead beast’s chest, which checked their rush at the slick. Then he struck flint and steel in frantic haste at Dunstan’s shout. <span class="j">“The cold sparks fizzled on the damp causeway flags without catching tinder or reaching the oil puddle ten paces out.”</span> A thrown javelin splintered against Dunstan’s shield, and an arrow rang off the entry stone, and the gnolls began to skirt the slick.</p>
+
+  <p>A third gnoll came round the flank. Jakal reached for another dart and found his belt loops empty, so he brought up his staff behind Dunstan. The gnoll’s spear scored Dunstan’s thigh as he cut the beast above the knee and dropped it in the archway, and Jakal cracked his staff across its muzzle. It dragged itself back into the weeds on its bad leg. When the next arrow from the hall splintered on the jamb, Jakal used the arch for cover, stepped out, brought his quarterstaff down hard on the lamed gnoll in the briars, and laid it dead, then pulled back behind the stone before the archer could draw a bead. Dunstan knelt to bind his wounded leg and told them to hold the choke while the last spearman retreated. Crouched behind the masonry, Jakal pressed the silver-leaved woundwort poultice under the bandage, and it knit cleanly against the spear cut and halted the blood.</p>
+
+  <p>The sleeping gnoll by the pillar began to wake and crawl. Dunstan braced his shield in the opening to cover Elmo, and an arrow slammed into its rim. Jakal cast his Magic Missile at the bowman across the yard, a bolt of force that struck it dead in the chest. But the crawling gnoll slipped into the hall despite Dunstan’s shout and Elmo’s shot, which glanced off the stone, and from the dark interior came harsh barking and the pounding of boots.</p>
+
+  <p>Jakal asked the others what the plan was. Dunstan had one. Calmert would light a brand now, and when the gnolls reached the spilled oil he would throw his second flask on top of it, and the brand would go in after. Calmert got a brush torch burning. Elmo said he would shoot the one giving orders. Spugnoir said he would hold the arch against anything that got through the fire. Shapes were massing in the hall doorway, and something big was growling.</p>
+
+  <p>Jakal warned Spugnoir to ready his flames for the gnoll leader barking from the rear. Dunstan shattered the second flask into the charging brutes, and Calmert’s torch turned the puddle into a roaring conflagration. Two gnolls were caught in the blaze. Beyond it a massive beast in thick hide tried to rally the survivors. Jakal told Spugnoir to hold his <em>Burning Hands</em> ready in case the chieftain charged through the wall of smoke; he never had to. Dunstan called out the leader’s position to Elmo and cut down a burning beast that staggered through the gate arch, and Elmo’s arrow struck the chieftain in the shoulder and checked the rally behind the blazing oil.</p>
+
+  <p>Then the fire died to embers across the stones, and the wounded chieftain vanished into the dark doorway of the great hall. What happened next is told two ways. Jakal’s own memory has him calling on the company to advance and finish the gnolls now, and also telling Dunstan that they were safe holding the gatehouse; Spugnoir remembers Dunstan counselling the gate and Jakal pressing the pursuit. Either way, Dunstan called back that he was going first, and crossed the smoking courtyard alone. As he reached the great hall’s threshold a javelin flew from the darkness inside and struck him hard. It split the rim of his shield and gouged his collarbone. Jakal stepped to the arch and hurled a dart across the courtyard at the doorway to cover his retreat. It bit into the doorpost and drove the gnoll back into the shadows, and Elmo sent an arrow after it to keep the entrance pinned while Calmert held his shield ready, and Dunstan pulled back across the smoking cinders.</p>
+
+  <p>Jakal hauled him behind Calmert’s shield at the arch and looked at the torn shoulder. The javelin had gouged a deep furrow in the flesh, but the bone was whole. He cleaned the wound and bound it tightly with herbal salve to staunch the bleeding. Across the courtyard the gnolls stayed back in the shadows of the great hall and would not venture into the open daylight. Then he laid his hand on the shoulder and spoke the words of the rite.</p>
+
+  <blockquote class="said jak">
+    <p>I laid my hand over Dunstan’s shoulder and spoke the words of the restorative rite. Warmth flowed from my fingers into the wound, mending the torn sinew beneath the linen wrapping.</p>
+    <footer>From Jakal’s own memory</footer>
+  </blockquote>
+
+  <p>Elmo kept his bow trained on the hall’s dark entrance while Calmert held the archway with his shield. When the rite was done they conferred behind the gatehouse wall. Elmo advised against forcing the barricaded hall doors, since the gnolls held every advantage across the open courtyard, and urged them to circle south through the reeds to look for the drain instead. Calmert and Spugnoir agreed that slipping through the outflow would bypass the gnolls’ fortified choke point.</p>
+
+  <p>That was the day’s healing, and Jakal had given it away. They went round through the tall reeds along the southern moat, watching the parapets, until in the shadow of the south wall Elmo parted a curtain of thorns and showed them a low stone culvert trickling foul water into the marsh: the outflow that Spugnoir and Jakal had guessed at. Dunstan cut the briars away with his sword and found a clear, narrow drain, three feet high. Jakal urged them, all the same, to hold off. Dunstan had no shield, his own darts were nearly gone, and his friends were arriving that night. Dunstan agreed, and as he dragged the cut briars back over the mouth of the drain the dry thorns crackled, and a gnoll leaned over the south wall, looked down at the cut brush and at them, and ducked away; barking went up inside. Elmo agreed they should go, but warned that they would be minding the drain when they came back.</p>
+
+  <p>At the smithy Dunstan haggled an oak shield from ten gold to eight, and Jakal bought two more throwing knives at two gold apiece. The third, said Smyth, had a loose tang and would be mended by next week.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>Jakal was an honest student, and the next hour taught him an honest lesson. In the heat of that kitchen room, with smoke from the hearth curling between the boards, he found himself asking a question. He was part cleric. Why shouldn’t he carry a mace and wear mail, like Calmert? His old masters’ voices gave him the answer. A priest’s blunt iron is no sin, and prayers rise as well through chain as through cloth. But the Art is different. He raised his arms stiffly, as though weighted, and began the passes of Sleep, and the pattern went sluggish and wrong. Across the table Spugnoir looked up from his notes with watering eyes.</p>
+
+  <blockquote class="said">
+    <p>“Wear iron and you can say goodbye to half your Art. Keep the half that prays and lose the half that burns.”</p>
+    <footer>Spugnoir of Dyvers</footer>
+  </blockquote>
+
+  <p>It is worth holding onto that line.</p>
+
+  <p>The village was empty in the heat. Jakal had gone out for air and was walking south along the dusty cart track when he heard heavy footsteps close fast behind him, and before he could swing his staff round a massive hand clenched in his collar and hurled him into the ditch. The fall hammered his ribs and shattered the clay vial in his satchel, soaking his robe. Towering above him stood Kobort, and Turuko lounged on the fence behind with a cruel smirk.</p>
+
+  <blockquote class="said">
+    <p>“Hommlet is a dangerous place for lonely scholars with wandering eyes.”</p>
+    <footer>Turuko the Baklunish</footer>
+  </blockquote>
+
+  <p>Kobort wrenched the staff out of his hands, snapped it over his knee, threw the pieces into the ditch, and shoved him back in for good measure. Turuko told him to leave the fens to men who knew them. Then they walked away toward the inn, and nobody came to help. He dragged himself up the bank, ribs flaring. His purse strings had torn. Coins were gone into the black muck, and his fingers turned up only cold silt. His ash staff lay in two halves, split along the grain far past mending.</p>
+
+  <p>He bought another at the trading post for three silver. The trader, a sharp-faced man, demanded the money up front and sneered that he gave no credit to vagabonds. Back at the Wench, Ostler made Jakal wash the ditch mud at the pump while Kobort and Turuko laughed. And then he went up to Spugnoir and told it plainly: the lane, the big man, the ditch, the staff broken across a knee. Spugnoir’s quill stopped halfway to the inkhorn.</p>
+
+  <blockquote class="said">
+    <p>“The fens. Not ‘leave Hommlet.’ The fens. They know where we go by day. And there’s no one to swear to it but you. Take it to Rufus and it’s a scholar’s word against two men who’ll say you tripped drunk into a ditch. I don’t like it, Jakal. Somebody wants us kept out of that moathouse.”</p>
+    <footer>Spugnoir of Dyvers</footer>
+  </blockquote>
+
+  <p><span class="j">“Yes,”</span> Jakal said. <span class="j">“And those two are going to be trouble. They will escalate.”</span> Of everything Jakal’s own early memories set down, it is the only spoken line they keep in quotation marks, and it was Marc’s.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>The druid was the next errand. Jakal asked the way to the Druid’s grove, and an elder of the Old Faith, he learned, kept it to the north, among oaks and a mossy dolmen. He went alone, past the knoll, through a hawthorn hedge. A grey-muzzled badger growled, and an elder with a crook stepped from behind the stone. He named himself Jaroo Ashstaff. He would not give Jakal the Old Faith’s rites. Jakal was a stranger who had broken through his hedge, and he kept company with the church folk. But he told him that the fen water was foul again, not to be drunk or used to wash a wound, and that the rot seeped out through the ruin’s drains. If Jakal would bring him a stoppered flask from where the water left the walls, he said, then they would talk of rites.</p>
+
+  <blockquote class="said jak">
+    <p>I will do as you ask. Do you have a flask you would like me to use to contain the foul liquid?</p>
+  </blockquote>
+
+  <p>It was the wrong thing to ask. Jaroo planted his ash crook in the turf, the badger bristled, and the old man’s voice went cold as river stone. <span class="sc">“I am no shopkeeper to dole out glassware to every careless scholar who breaks my hedge. A man who professes knowledge of the green should carry his own clay. Leave the circle now and do not return until you hold the sealed water, lest my ward see you out.”</span> Jakal backed away blind into a thicket, and the thorns tore his sleeves and his ribs. He tried the restorative rite on himself, and nothing came. The grace of the day had already gone into Dunstan’s shoulder.</p>
+
+  <p>Spugnoir washed the thorn cuts with well water and bound them with strips of his spare shirt. Then Jakal did what he could about the flask. He went to Ostler and asked whether he had a spare small container, and Ostler gave him a mustard crock the cook was done with, for nothing. <span class="sc">“Rinse it at the pump. No charge, so long as you’re not brewing anything foul up in my rafters.”</span> Jakal said, <span class="j">“Thank you, sir. You are kind. This is important for me,”</span> rinsed it, and carried it up to the room. It was a small thing. It would matter.</p>
+
+  <p>He looked at the broken company he commanded. <span class="j">“I don’t think we’re going to be ready for tomorrow,”</span> he said. <span class="j">“We may have to rest another day. My ribs are cracked.”</span> Spugnoir agreed at once: <span class="sc">“Only a fool marches into an alerted garrison with a broken chest and empty spellbooks.”</span> Jakal studied his arcane books, and offered his friend the use of any of them. <span class="j">“Wizards who share gain power and intelligence!”</span> Spugnoir pointed out, kindly, that copying another man’s script wanted rare inks, days of quiet and <span class="sc">“a mind unfogged by pain and mutton grease.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>Late that afternoon he went down to the common room and found a quiet spot to sit. <span class="j">“I have a friend I’m expecting to arrive,”</span> Marc wrote for him, and Ostler pointed him to the corner bench: <span class="sc">“Quiet hour, scholar. Nobody’ll trouble you there.”</span> Hours passed. At one point he thought of Calmert; then he corrected himself. <span class="j">“No, not Calmert, there’s another cleric friend on her way. I keep an eye out for her.”</span> She did not come. Nobody did. Zert, the Wild Coast sellsword, smirked and mocked a question Jakal asked about whether the ruin was a moathouse or a keep, sneering that names would mean nothing once the gnolls in the cellars had finished. Jakal came to a conclusion. <span class="j">“I think they are spies,”</span> he told Spugnoir upstairs, speaking of Zert and Turuko and Kobort alike, <span class="j">“for whatever lies underneath the moathouse.”</span> He suggested they pack and find lodging, perhaps at the church. Spugnoir counselled patience: <span class="sc">“If we go down those stairs now with our packs on, that sellsword will know he’s rattled us. Let Calmert ask the Canon when he comes at seven. A brother of the Cudgel gets a cot for his friends. Two strange mages knocking get a sermon.”</span></p>
+
+  <p>It was good advice, and for a while it worked. Just before eight they slipped out through the kitchen and not past the hearth, and climbed the knoll to the Church of St. Cuthbert. Jakal asked Calmert for help.</p>
+
+  <blockquote class="said jak">
+    <p>Calmert, my ribs are broken and I won’t be much use. Can you lend aid? Dunstan will need healing too.</p>
+  </blockquote>
+
+  <p>Calmert laid his hand on Jakal’s chest and prayed to the Saint, and a soothing warmth knit his cracked ribs completely. Jakal tried to thank him; Calmert said the thanks were owed to the Saint, not to him. Dunstan was helped in a little later, limping, blood through his binding, and Canon Terjon, from the chancel, permitted the sellsword a bench: <span class="sc">“The sellsword keeps his bench. The Cudgel does not turn out the wounded.”</span> Then he turned his eyes on the two mages. <span class="sc">“But this is a house of prayer, not a lodging for spell-mongers. You two sleep at the inn.”</span></p>
+
+  <p>What Jakal did next, he did out of sincere good manners. It was the worst thing he did that month.</p>
+
+  <blockquote class="said jak">
+    <p>It’s okay, Spug. We’ll find a different place to rest our heads tonight. We must show proper respect to the Canon and the church. I thank you, Terjon, for the consideration you’ve shown us. We are grateful.</p>
+  </blockquote>
+
+  <p>The Canon’s jaw tightened. His dark eyes flashed in the candlelight. He had heard, in the omission of his title, a calculated insolence.</p>
+
+  <blockquote class="said">
+    <p>“That is Canon Terjon to the likes of you, and Saint Cuthbert demands discipline and proper deference, not the breezy insolence of hedge-wizards. Out with you both — before I decide your companion’s presence on our bench is a mistake as well.”</p>
+    <footer>Canon Terjon</footer>
+  </blockquote>
+
+  <p>Calmert winced and stared at the flagstones, not daring to contradict his superior. Terjon shoved the two of them out into the night and barred the oak doors behind them, and Jakal tripped on the stones and tumbled down the slope. From the lane below, a whistle sounded.</p>
+
+  <p>He was on his feet at once. <span class="j">“Be alert, Spug. That whistle may be dangerous,”</span> he whispered, and made what defensive preparations a man can with a staff. It was a cottar calling his sheepdog. <span class="j">“Phew, false alarm,”</span> Jakal laughed shakily. <span class="j">“I’m jumpy, my friend. Where do you think we can rest safely? I’m not going back to that dreadful room.”</span> Spugnoir knew the place: the hayloft over the inn’s stable yard, with dry straw and an iron latch. They slept in thistles and straw, and before dawn Jakal confirmed that his Sleep, his Magic Missile and his healing had come back to him.</p>
+
+  <p>In the morning he waited on the church steps through the office, until Calmert came out and told him Dunstan was not coming back. The woodsman had taken him by the back hedges toward the east road before the first bell. Jakal rose and walked after them in the cold of the early morning. On the track the fog lay thick as wool, and Elmo was crouched in a wet ditch with two fingers in a print.</p>
+
+  <p><span class="j">“Your call, Elmo, on what we should do,”</span> Jakal said, crouching beside him. <span class="j">“I’m no woodsman, but I smell gnolls prowling and up to no good.”</span></p>
+
+  <p><span class="sc">“Your nose is better than your eyes, then,”</span> said Elmo. Two of them, he read in the mud, long splay-toed prints with claws dug deep. One was dragging something heavy, a cottar’s ewe most likely. They would not fight them on open track in this murk. They would let them get a good way ahead, and follow slow, off the road. <span class="sc">“They’ll lead us home, and they’ll be fat and lazy with meat when they get there. But the drain’s going to be watched. I’ll not lie to you about that.”</span></p>
+
+  <p>Jakal told him the call was his. The fog thickened. And as he stepped forward to follow, his new staff plunged through a moss crust and he crashed headlong into an alder thicket with a loud crack. Elmo said, with great economy, that everybody should get down.</p>
+</section>
+
+<!-- ============================ PART FOUR ============================ -->
+<section class="part" id="p4">
+  <h2><span class="num">Part Four</span>Down the Culvert</h2>
+  <p class="when">World days 5–6 · played 28–29 September</p>
+
+  <p>They followed the gnolls through the sedge at a respectful distance, and for most of that morning Jakal’s chief enemy was the terrain. His staff sank in a mud-hole. His hem snagged on a bog thorn. A dart caught in his cuff, and when he tugged at it, <span class="j">“the barbed tip ripped through the heavy wool and scratched my wrist.”</span> Ahead of him, Dunstan quietly found the south culvert unguarded.</p>
+
+  <p>Jakal had not forgotten the druid. At the mouth of the drain, before they went in, he filled the clean mustard crock with water from the culvert, bunged it, and hid it under the roots of an alder. He would need it later. Then he went in after the others, on his hands and knees, up the wet stone into the cellar corridor.</p>
+
+  <p>The barred door on the west side was still there. From the other side came a scrape on the lower planks, and a single soft knock, and the crooked beam shifted in its bracket. Calmert admitted, in a whisper, that his turning of the dead was untried. Jakal whispered to Dunstan that they shouldn’t leave that thing at their backs and had to deal with it.</p>
+
+  <p>The bracket gave way with a loud screech and three rotting corpses stumbled out into the torchlight. Jakal called on Calmert to turn them in Cuthbert’s name and drew a dart. The dart skipped off a skull and tore away scalp. Dunstan’s shoves, Calmert’s mace and Elmo’s arrow finished the first; Dunstan hamstrung the second; and Jakal’s second throw buried a dagger squarely in the third one’s eye socket. He knelt, braced his boot against the body, and wrenched. The iron snapped clean off at the guard with a sharp crack, leaving the point ruined in the bone, and he stood there, as the company regrouped, holding the hilt of a dagger that was no longer one.</p>
+
+  <p>It was not all farce. At the next turning a spearman drove his point through Dunstan’s ribs. Jakal tried to haul him back and instead threw Calmert off his feet; but when three gnoll warriors came charging up the passage he put two of them to sleep, and Dunstan killed the sentry. Then Jakal did the thing he would later propose again and then, on better advice, decline. <span class="j">“I stepped past the dead spearman, retrieved my throwing dagger, and slew the two sleeping gnolls where they lay on the passage floor.”</span> He healed Dunstan afterward.</p>
+
+  <p>The next thing they met was something taller than a gnoll. They heard it first, a voice too deep to be any gnoll’s barking below the stairhead, and then Elmo, hauling up a portcullis with Dunstan, found bare footprints twice as large as a gnoll’s. It was an ogre. It broke through the splintered door, and Jakal’s last dart and his Magic Missile both struck home, and it split Dunstan’s shield with its club and threw him down with his ribs torn open again.</p>
+
+  <p>Dunstan had held the choke with Calmert and bellowed at the ogre to come through, and it had. What Jakal remembered was the half-second afterward, when the ogre stood over a fallen friend and only Calmert stood in front of it. He did what a scholar does who has never been taught to do it. <span class="j">“I stepped in front of Dunstan with my cured ash staff raised and called on Elmo to use his axe. My staff deflected the ogre’s club into Calmert’s braced shield, checking the brute’s momentum completely.”</span> Elmo buried his axe in its side. Dunstan struck from below. The thing went down in the dark with the dust shaken off the ceiling.</p>
+
+  <p>In its lair stood a chest. Jakal looked for traps and found none, and Dunstan snapped the tip off his sword prying at it, then beat the lock off with his pommel. Inside lay silver and copper, a heavy stitched purse, and a brooch set with a green stone. Calmert was out of prayers. Dunstan’s ribs were bad. Jakal took the decision himself and gave the order to retreat, collecting the crock from under the alder on the way out. They went home by the back trails.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>On the church knoll, in his own words, <span class="j">“I cut open the stitched purse, counted out sixty gold pieces and gave twelve to each of us, and I kept the green brooch until it can be valued.”</span> On the churchyard wall sat Zert, the Wild Coast sellsword, swinging one boot. Dunstan saw him lift two fingers to a heavy man in the lane below, and the heavy man set off toward the inn. <span class="j">“Those spies in town, like the one watching us,”</span> Jakal said, <span class="j">“concern me.”</span></p>
+
+  <p>The Canon had not forgotten him. When Jakal helped Dunstan down the nave, Terjon met him with fierce anger and demanded a gold piece from Dunstan for the bench, ordering Jakal out of the building. Dunstan reached for a coin. Jakal got there first. This time he did what he had learned the hard way, and addressed the Canon with every title he could muster, thanking him for his hospitality, and dropped a gold piece into the alms basin himself.</p>
+
+  <p>Outside on the steps he let out a breath. <span class="j">“Well, the Canon simply hates us both, maybe me even more. Let’s not set foot in there again.”</span> Spugnoir gave a dry snort. <span class="sc">“He took your gold readily enough. But agreed.”</span> Elmo, who had not turned his eyes from the lane, said, <span class="sc">“The Canon’s no worse than his word. He keeps his house, and Dunstan’s safe in it. It’s the one down there I’d mind.”</span> Down there Zert was still sitting on the wall in the sun, swinging his boot.</p>
+
+  <p><span class="j">“Maybe it’s time we sent Zert a message,”</span> Jakal said, and Elmo gripped his arm and warned him against starting a brawl on the church knoll.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>He and Spugnoir carried the crock to the grove. The grey badger watched them pass without a snarl. Jaroo took it and gave Jakal, in return, dried sweetflag and willow-herb, and told him the rot came from <em>ancient elemental altars entombed in the deep vaults.</em> Then Jakal asked for what he had come for.</p>
+
+  <blockquote class="said jak">
+    <p>If you are willing I would like to learn more of your practice and understand my role in protecting the earth and all living things against this creeping evil.</p>
+  </blockquote>
+
+  <p>The druid’s face closed. He looked at the church’s holy water slung at Jakal’s side, and at the iron at his belt.</p>
+
+  <blockquote class="said">
+    <p>“You already carry one priest’s rites, and you sleep under the Canon’s roof. The Old Faith takes a whole life. It is not half of one handed out to a boy with a broken hedge behind him. Your part is plain. Break what feeds the rot. Do not come asking for my songs. Leave the circle now. Come back when the fen runs clean, and not before.”</p>
+    <footer>Jaroo Ashstaff</footer>
+  </blockquote>
+
+  <p>Jakal bowed and backed toward the hawthorn gap. The badger clamped his robe, and he tumbled onto the track. Spugnoir hauled him up. Jakal would carry the druid’s words to the end of the month: <em>break what feeds the rot.</em></p>
+
+  <p>They needed somewhere to sleep that was not the Wench, not the church, and not anywhere Zert’s idlers watched. Brother Smyth directed them to the wheelwright or the woodcutter. Spugnoir weighed both: the wheelwright’s place was watched by the taproom idlers at the crossroads, and the woodcutter’s cabin was lonely and open to ambush. Jakal chose the woodcutter. They went out the smithy’s back door behind the coal shed and through hedges and ditches to a cabin at the forest’s edge, where a man named Corl offered the hayloft for a few silver pieces. His boy Tad had a weeping hatchet-nick on his shin.</p>
+
+  <blockquote class="said jak">
+    <p>I also possess some small skills in the healing arts. If you or any of your family are in need of healing, I would like to be of assistance.</p>
+  </blockquote>
+
+  <p>Corl said yes. By the hearth, Jakal called for warm well water, cleansed the gash, applied crushed willow-herb, and bound the leg in clean linen, while Corl watched with a quiet gratitude. Corl took a silver off the price of the loft.</p>
+
+  <p><span class="j">“What’s your name, son? I am Jakal, and my companion is Sir Spugnoir.”</span> (Spugnoir, who was not a knight, raised an eyebrow and cleared his throat.) Then Jakal asked whether Tad might walk with him. <span class="j">“Well, Tad, how about you and I go outside for a walk, and I can chat with the plants. If you listen, you might just hear them answer me.”</span> Corl said, <span class="sc">“Don’t take him past the woodpile, master scholar. His leg is tender yet.”</span> In the yard, kneeling at the forest hem, Jakal crushed a stem of plantain between his fingers and showed the boy how to tell it from its lookalikes. Tad listened with rapt wonder for the stems to speak.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>The green-stoned brooch was Corl’s next problem. <span class="sc">“The trading post up by the crossroads is where folk take barter and old trinkets,”</span> Corl said. <span class="sc">“Rannos and Gremag have the coin for it, though they’re Dyvers men and will squeeze three coppers out of every silver piece. If it’s old work or has an odd look to it, Lord Burne up at the stone tower sometimes buys ancient oddities for his study, and he’ll pay an honest count if it pleases him.”</span> He added, as an afterthought, a warning against showing fine silver to every loafer on the road. Jakal examined the brooch for magic and found none, only old Kron Hills work, and carried it to the tower by the back ways. Burne priced it at twenty gold. Jakal asked, instead, for a scroll, or supplies. Burne refused to part with any spell for a mundane curio; the arcane trade, he reminded him, was for recovered lore. Jakal took the twenty Verbobonc gold.</p>
+
+  <p>Before dawn he went back to the church and, keeping his word, only knocked and stood back, without going in. He told them about the brooch and divided the gold evenly among them, four apiece. <span class="j">“At least this is something for the blood we’ve spilled.”</span> Calmert had already tended Dunstan: <span class="sc">“I laid hands upon him as soon as the first light touched the chancel. The bone has knit cleanly, and his breath comes easy again.”</span> Jakal handed Calmert a silver for the church’s contributions. And then, because it needed saying, he said it to Spugnoir and Calmert both.</p>
+
+  <blockquote class="said jak">
+    <p>Spug, Calmert, I need to tell you both that in the moathouse you need to show more initiative. Elmo already acts on his own and has saved us several times. Don’t wait on my asking to use your spells and prayers, based on your own judgment. That is critical when blades are drawn or undead come at us. We must react swiftly and fight as one to overcome the terrors in the moathouse and purge the evil that festers there. Agreed?</p>
+    <footer>Marc, as Jakal, on the church steps</footer>
+  </blockquote>
+
+  <p>Calmert agreed, and Spugnoir assented. Then Jakal told Spugnoir he wanted to see him <span class="j">“light up one of those terrors with your flaming hands spell. That will be quite the sight!”</span> and Spugnoir, with a dry, confident smirk, said, <span class="sc">“Keep them from crowding my flanks, and I shall give them more fire than their hides can bear.”</span></p>
+
+  <p>They set out from the knoll. Jakal had a plan for Zert: they would walk in plain sight until they reached the woods, then he and Spugnoir would break off and wait in the trees, and if the villain followed, <span class="j">“Spug and I will teach him to fear the arcane arts. Agreed?”</span> Elmo quietly ruled it out. They were on the east track when Jakal stopped.</p>
+
+  <p><span class="j">“Wait. Where’s Calmert?”</span></p>
+
+  <p>Elmo pointed back toward the ridge, where the acolyte had stayed by the chancel rail. Dunstan said that four blades were enough and the morning was wasting. Jakal said no. <span class="j">“I refused Dunstan’s call to march without Calmert, insisting we return to the church to wait until he was free. I told the company to speak up and remind me whenever I forgot someone important.”</span> He would not proceed without him. Dunstan, with a look, gave way and led off toward the knoll, and when the oak door opened, Calmert stood there fully armed and armoured, with both his morning blessings ready.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>The second descent was the one that worked. Elmo judged the lone sentry over the culvert easier to take than the causeway, and Jakal asked him to kill it with a single fatal arrow, and the gnoll turned away and they all went in. In the guardroom Dunstan kicked in the door and Jakal’s Sleep took four gnolls at once. They lay snoring, tied, sprawled across the table and the benches.</p>
+
+  <blockquote class="said jak">
+    <p>Shouldn’t we just kill these gnolls? They are evil and clever. If they were human, I’d say bring them back for justice, but these things aren’t remotely human.</p>
+  </blockquote>
+
+  <p>Elmo’s answer was dry: <span class="sc">“A slit throat saves rope, though Rufus paid coin for the last lot, and a captive brute might squeal on what lies past that narrow way if Terjon or the captain puts the question to it.”</span></p>
+
+  <p><span class="j">“Good point,”</span> Jakal said. <span class="j">“We’ll bring them back to Rufus. He’ll decide their fate. Well thought.”</span> Dunstan, pulling hemp taut across the third brute’s ankles, looked up. <span class="sc">“Keep them breathing for now. Live ones talk, and Rufus pays for a string of captives same as he’d pay for their ears. We can always finish it later if they give us trouble.”</span></p>
+
+  <p>Prodding along the mortar behind the overturned dice table, his staff struck a hollow sound. A loose block hid an iron coffer, its latch unlocked, with silver and two polished carnelians. He took it. <span class="j">“We’ll divide it evenly when we’re back in Hommlet. Jaroo mentioned ancient elemental altars deep inside here. Keep an eye out, though they’ll probably be very obvious! Lead on, Dunstan.”</span></p>
+
+  <p>It was Dunstan who heard the prisoner. They had come to an iron-banded door beyond a coal brazier, and the sellsword laid his ear against it and held up a hand. Past the crackle of the coals: the weak, shuddering breath of a man, and the slow chink of iron.</p>
+
+  <p><span class="sc">“There’s a prisoner chained within,”</span> Dunstan whispered.</p>
+
+  <p>Jakal’s iron key jammed in the lock with a harsh rasp. He found a poker in the hearth, and Dunstan put a shoulder to the door, and the bolt sheared with a dull crack. Inside, a man was chained to a ring in the wall by rusted riveted cuffs, and when the chain rattled, he flinched. His name, when he could give it, was Paul of Nulb, a teamster ambushed on the road. He told them the layout of the place. Jakal and Dunstan levered the staple out of the mortar between them.</p>
+
+  <blockquote class="said jak">
+    <p>Let’s double back to the others and tell them what we’ve found out. Dunstan, come with us. Teamster, we’ll get you out of there.</p>
+  </blockquote>
+
+  <p>As they came back toward the forward room, Elmo, hearing the chink of the freed man’s irons, almost loosed an arrow at the sound.</p>
+
+  <p>They put the last matter to a vote. Elmo wanted the wounded chieftain, Calmert the dark cleric, and Spugnoir warned that the humans might be tricked. Jakal put it to the company and called for the chieftain first, and Calmert conceded without rancour, acknowledging that a broken pack clears the way.</p>
+
+  <p><span class="j">“Paul, you stay here. We’ve cleared everything in the area, so you’ll be safe. The rest of us? We have a gnoll chieftain to put to rest. For good.”</span></p>
+
+  <p>The chieftain’s chamber was the morning’s work. Spugnoir’s Sleep dropped three bodyguards. The chieftain turned aside Dunstan’s thrust, and Jakal, maneuvering for a line, loosed a Magic Missile that struck him. Then, still moving for an open shot, Jakal hurled a leaf-bladed dagger into the gnoll chieftain’s collarbone, and Elmo’s axe finished it. Jakal wanted to return to Hommlet with all seven captives and Paul. Elmo said that herding seven gnolls was enough work for one morning.</p>
+
+  <p>At the keep Rufus paid fifty gold for the lot. Burne bought the garnet armband and the agate for forty. Jakal laid them on the drafting table and slipped the carved bone whistle back into his pouch. <span class="j">“That whistle might come in handy some day,”</span> he said with a chuckle. Burne counted out forty bright coins of Verbobonc mint and gave him a warning.</p>
+
+  <blockquote class="said">
+    <p>“A fair price for honest trade. If a priest of the Black Church nests in the cellars, beware of unholy water and foul cantrips of blindness and despair; keep your cleric’s cudgel close and grant the heretic no time to utter a blasphemous plea to his dark patron.”</p>
+    <footer>Master Burne</footer>
+  </blockquote>
+
+  <p><span class="j">“Thank you, Master Burne. We will clear that dark cleric out of his nest.”</span> At the gate he divided the coin: eight gold from Burne’s forty to each of the five, and thirty-one silver, three electrum and two gold each from the moathouse hoards. He kept the odd coins and the carnelians to be sold and split later. Nobody quarrelled. Then he healed Dunstan at the keep gate, and Calmert finished the mending with a prayer that Jakal reminded him he still held. <span class="j">“You took a lot of damage there, my friend, and I think you need a new shield! Why don’t you stop by the smithy and see what he has. Spug and I will head to the woodcutters. Meet up tomorrow at dawn and finish our task? What say you all?”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>Jakal proposed that they meet at sunrise. Elmo warned that a full day would let the priest bolster his defenses or flee, but agreed. That left Jakal the rest of the day, and he spent part of it with Tad. He took the boy out and showed him which fungus were dangerous, and which could be used for headaches and health, and which could open up the unseen world. <span class="j">“Those last ones are not to be played with, Tad. When you are older, perhaps.”</span></p>
+
+  <p>Then he went to the smithy. <span class="j">“Brother Smyth, it’s good to see you. Do you have, perchance, a two-handed maul?”</span> The smith had two. Jakal hefted one, swung it, and nearly went over. <span class="j">“Yeah, that’s way too heavy. You have a mace I could try out?”</span> Smyth reached behind the tool hooks and drew out an iron-flanged mace on a leather-wrapped ash haft. It sat easily in the hand, close-balanced, and he made a few light testing swings in the hearth-warm air.</p>
+
+  <blockquote class="said">
+    <p>“That one has six flanged ridges and solid ring-welds. A proper piece for a man of the cloth. Six silver pieces, and it will crack mail or skull alike without tiring your arm.”</p>
+    <footer>Brother Smyth</footer>
+  </blockquote>
+
+  <p>Jakal bought it. Then he walked back to the cabin and, before going in, set up targets in the yard and practised strikes and parries for a while. In the loft he and Spugnoir went over the plan. <span class="j">“My concern is the dark cleric’s spells. What might he use on us?”</span> Spugnoir listed what a priest of that church might bring: curses of ill fortune, a necrotic touch that inverts healing, command words, perhaps a paralysis or a spectral force. Jakal turned it over. <span class="j">“So darts and daggers thrown would also disrupt?”</span></p>
+
+  <blockquote class="said">
+    <p>“Aye, anything with a sharp edge or enough sting to break his concentration. A priest’s rite demands steady breath and an undisturbed cadence. A dart nicking the throat or a dagger biting into the shoulder ruins the prayer entirely before the power can take form.”</p>
+    <footer>Spugnoir of Dyvers</footer>
+  </blockquote>
+
+  <p>They rested until morning.</p>
+</section>
+
+<!-- ============================ PART FIVE ============================ -->
+<section class="part" id="p5">
+  <h2><span class="num">Part Five</span>The Black Doors</h2>
+  <p class="when">World day 7 · played 30 September</p>
+
+  <p>They met in the mist. The two mages from the woodcutter’s found Dunstan already waiting, and Elmo and Calmert came after. <span class="j">“Let’s wait for the others,”</span> Jakal said, and then, when they had gathered, <span class="j">“Are we ready? Are we all here?”</span> They were. He looked down the east track, where the fog hung over the sedge, and said the line that everything afterward would answer to.</p>
+
+  <blockquote class="said jak">
+    <p>Lead on, Elmo. There’s an evil to end.</p>
+  </blockquote>
+
+  <p>They went in by the culvert. On the way, in the black fen, Jakal stepped on a bank that wasn’t one and sank to his chest in peat. Dunstan crashed through the bank behind him and hauled him out by his collar, and the two of them lay in the reeds, mired and dripping, in full view of the moathouse. No alarm came. Further in, Jakal crept up to a pair of black oak doors in the southern passage and put his ear to the wood. He heard two armoured men, and the clink of mail, and a voice chanting in a measured way, and he withdrew without being heard. He had found the place they were looking for.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>The corridor outside the double doors was dim and drafty. The company waited there for his sign, braced against the stone. Behind the oak the chanting dipped into a harsh cadence, and the cold scrape of iron went across the flags. It was then, with the whole of the evil thing waiting on the other side of a door, that Marc typed a line for Jakal that has no fighting in it at all.</p>
+
+  <blockquote class="said jak">
+    <p>I think to myself, what god do I serve?</p>
+  </blockquote>
+
+  <p>The narrator answered by recalling his schooling. He had been schooled at the academy in the rites of healing and the invocations of knowledge, taught to call upon the divine light of wisdom without binding his soul to a single zealot’s altar. Calmert gripped his mace in devotion to the stern Cudgel. Jaroo held the unyielding earth of the Old Faith. <em>But your calling,</em> the narration said, <em>has always walked the narrow ridge between the higher powers and the arcane mysteries of the weave.</em> Dunstan and Calmert put their shoulders to their shields. Spugnoir watched Jakal’s hands.</p>
+
+  <p>He leaned close to Calmert and breathed the question every general asks: <span class="j">“Do you have any prayers that would improve our chances?”</span> The young cleric whispered back. <span class="sc">“I hold the Cudgel’s blessing to steady our strikes and steel our resolve. And a prayer of mending should someone fall. If I am to invoke St. Cuthbert’s favor upon our blades, I must speak the rite out here before we force the door. The blessing will not take root once the melee is joined.”</span> Calmert spoke the rite. Jakal felt the steadfast vigor of the Cudgel strengthen his limbs. Dunstan put his boot to the latch.</p>
+
+  <p>Lantern light flooded the hall from a chamber hung in black drapery, where two armed men leaped from their bench and a hooded acolyte stopped, mouth open on his litany.</p>
+
+  <blockquote class="said jak">
+    <p>Spug, flame or sleep!</p>
+  </blockquote>
+
+  <p>He sidestepped along the wall to clear a line past Dunstan’s shield, traced the passes, and a glowing bolt leapt from his fingers and struck the acolyte full in the chest with a flat crack of force. The chant tore out of the man’s throat. <span class="j">“Dunstan, hold those two off! Elmo, arrows in that dark priest!”</span> Elmo’s arrow found the acolyte’s shoulder. Jakal reached for a second spell and found that he was empty. And then Jakal did something he had practised in a woodcutter’s yard, with a mace he had bought for six silver. He unhooked it from his belt, squeezed past Calmert’s shoulder as the cleric locked shields with Dunstan in the doorway, and slipped across the threshold while the two guards were busy with oak and iron.</p>
+
+  <p>The acolyte leaned against the altar with an arrow in his shoulder, groping for a curved dagger. Jakal closed in two quick strides. He raised the mace with both hands on the wrapped ash haft and brought it down on the man’s temple before he could raise the blade. The iron crunched against skull with a sickening crack. The acolyte’s eyes rolled back and he folded onto the altar steps. Then Jakal struck the nearer guard from behind across the knee and felled him; Dunstan killed the second as it turned on Jakal; and the chamber went quiet.</p>
+
+  <blockquote class="said jak">
+    <p>Well done, men!</p>
+  </blockquote>
+
+  <p>He stepped over the dead to search them: coarse copper bits, bent iron tokens stamped with an eye. He pried a leaden holy symbol from the acolyte’s neck. And when he laid his hand on the black-draped altar to look beneath its hangings, a frigid, unnatural shock pulsed through his fingers. The dark altar rejected his Cuthbertean devotion with a sickening jolt, searing his palm, setting his breath ragged, mottling his skin. The room had no gold in it. It had stale incense, profane vestments, and the grim certainty that a darker master waited nearby.</p>
+
+  <p>Behind the black hangings Jakal felt a draft. He found a seam, and a pivoting flagstone for a release, and checked for traps. Then, before anyone opened the door, he did not leave the altar as he found it. <span class="j">“I go over to the altar and say a blessing over it to cleanse the space. I ask Calmert to assist in purification.”</span> Between them they chanted a rite that quieted the thing, and Calmert warned him honestly that a full purification wanted Canon Terjon’s rites or heavy hammers. Then Dunstan opened the door onto a stair that smelled not of marsh rot but of sandalwood and beeswax. On the fifth step, Jakal’s staff cracked.</p>
+
+  <p><span class="j">“Let’s head down further,”</span> he said. <span class="j">“There’s more evil to root out here. Dunstan, take the lead?”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>What he found at the bottom was not a dungeon but a richly furnished bedchamber, warmed by candles and carpeted in deep tapestries. At the centre table sat an armoured man of striking, fair features, dressed in black and purple vestments, absorbed in counting coins and reading a ledger. A silver mace lay beside his elbow. He did not look up.</p>
+
+  <p>Jakal slid his own mace back into its leather loop. He cleared his throat with a dry, deliberate cough.</p>
+
+  <p>The fair-featured cleric looked up smoothly from his parchment. There was no frantic alarm in him, and no grab for the silver mace. Candlelight caught the embroidery of his silks and the cool amusement in his pale eyes. He laid his quill across the open ledger and leaned back, ringed fingers together over his lap.</p>
+
+  <blockquote class="said">
+    <p>“Few enter unbidden without blood on their coats. If you have come all this way through the mud to treat with Lareth, speak your piece before my patience wanes.”</p>
+    <footer>Lareth, in his study at the bottom of the moathouse</footer>
+  </blockquote>
+
+  <p>Behind Jakal, Dunstan stood half-drawn in the shadow of the doorframe, his knuckles white on the grip. Jakal demanded the cleric’s surrender in Verbobonc’s name. Lareth mocked the name, kept his hand off the silver mace, and asked what terms he might expect, and what assurances Captain Rufus might offer a man of his standing. Jakal turned his head and shouted up the secret stair for Spugnoir and Elmo. The footsteps came down in a clatter of bow-wood and boots, and the corridor filled with armed men.</p>
+
+  <blockquote class="said jak">
+    <p>It’s your choice, priest. What is your answer?</p>
+  </blockquote>
+
+  <p>Lareth’s cool smile faded to a cold, assessing gaze. He spread his empty hands on the table, well clear of the mace.</p>
+
+  <blockquote class="said">
+    <p>“A prudent commander knows when the board is against him. You have steel and numbers at my door, scholar. I have no desire to die in a cellar over the Viscount’s dry justice. Escort me safely to your captain, unmolested, and the coffer — and whatever guidance I might offer concerning the greater powers stirring in the south — is yours.”</p>
+    <footer>Lareth the Beautiful</footer>
+  </blockquote>
+
+  <p>He stood with deliberate slowness. Jakal ordered him to step away from the table and keep his hands raised, and Dunstan pinned the wrists and tied them with double half-hitches. Jakal searched the room: a ledger, a letter sealed with an eye, and a steel key on the priest’s belt that opened the coffer. Inside lay two hundred gold, a pouch of gems and sealed papers. He took them all. Then he picked up the silver mace.</p>
+
+  <p>It was a fluted thing, wrought of hardened silver over fine steel, its haft chased with runes that hummed lightly in his grip. He turned it in the candlelight, testing the balance of the flanged head, and looked down at the bound priest. With Dunstan’s blade a hand’s breadth from his throat, Lareth had not struggled.</p>
+
+  <blockquote class="said jak">
+    <p>So tell me about this mace, cleric.</p>
+  </blockquote>
+
+  <p>Lareth’s head tipped back, and a faint, disdainful smile touched his lips despite the hemp on his wrists.</p>
+
+  <blockquote class="said">
+    <p>“It is forged of silvered steel, balanced to strike true and shatter iron as easily as bone. A weapon consecrated in secret rites to lend weight and precision to every blow, far beyond any clumsy smithwork of Hommlet. Keep it, if you imagine you have the strength to wield it — though such steel has a way of remembering who commands it.”</p>
+    <footer>Lareth the Beautiful</footer>
+  </blockquote>
+
+  <p>Dunstan narrowed his eyes and did not shift his stance. Jakal checked the room over once more to be sure he had gathered everything of value. <span class="j">“Let’s go, men. Rufus has a new visitor to meet.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>Burne broke the eye-stamped seal in his study and identified Lareth as an agent of the revived Temple cult. Rufus paid the twenty-gold bounty. Jakal, listening, felt his grasp of the clerical rites deepen with the victory. Then he reminded Burne of the trade that had been proposed, spells for lost dweomers, and Burne, with a cool formality, declined: the recovered letters were political intelligence rather than magical scrolls. If Jakal wanted a circle of spells, he could bring Burne lost dweomers or pay a thousand gold per circle. Burne turned the silver mace under his glass, announced that formal identification would carry a steep price, and turned back to his desk.</p>
+
+  <p>Jakal lifted the mace from the table. In the bailey, in the morning sun, by the well, he gathered Dunstan, Calmert and Elmo and said plainly that the mace was worth more than any one share. <span class="j">“I would keep it and have the rest of you divide up the loot. Only if that feels acceptable. If not me, then Calmert should have the mace. What do you all think?”</span> Elmo said he had no use for a priest’s mace. Dunstan grinned and let him. Calmert looked at the runes, and then at Jakal. <span class="sc">“Carry it, and use it in St. Cuthbert’s cause.”</span> The coins and jewels were divided into four equal shares, a share to each of his companions: fifty gold pieces and a share of the gems apiece.</p>
+
+  <p>At the Wench that morning Ostler set hot salt pork, cabbage stew, rye bread and foaming cellar ale before them and quietly warned them not to flaunt their success before watchful eyes, and Turuko and Kobort watched from the window table. Spugnoir was missing from the room. <span class="j">“Where is Spug? He should be here.”</span> Elmo and Calmert told Jakal where he had gone, to Jaroo, and Jakal led them all up to the grove, where Spugnoir relayed what the druid had told him: the moathouse’s shrines answered to four elemental nodes of the Temple. Jakal told the old man what they had done: <span class="j">“We did what we could to cleanse the altar, but I don’t think we have the power to fully cleanse it. We’ve captured it, killed the foul things in there. So you may want to ensure that altar is permanently silenced.”</span> Jaroo scorned the church’s half-measures and refused to go himself. Hammers must break it, he said, and the fen be watched. Jakal sent Calmert to Canon Terjon.</p>
+
+  <p>The Canon met them on the church steps with stern approval, setting aside past grievances. He promised hammers before nightfall. Jakal gave one of the carnelians to the church as a tithe, and Terjon gave him a blessing. And then Jakal asked a question.</p>
+
+  <blockquote class="said jak">
+    <p>Is it acceptable if I stay a while and pray, giving thanks to St. Cuthbert?</p>
+  </blockquote>
+
+  <p>Canon Terjon inclined his head. The sourness left his face for a moment. <span class="sc">“Giving thanks is never unwelcome on this knoll,”</span> he said, and held the oak door open. <span class="sc">“Kneel where you like. The Cudgel hears plain prayer as well as fine.”</span></p>
+
+  <p>The companions hung back on the steps. Elmo shrugged and settled against the wall. Dunstan leaned on his scabbard, and Spugnoir waited with his satchel. Jakal went in alone. The nave was cool, and smelled of tallow and old stone. He knelt on the flagstones before the altar and gave thanks for the moathouse’s fall, and for friends who came out alive. The quiet held. It is the last time the record shows him welcome inside that church.</p>
+
+  <p>Afterward Jakal led the company down from the knoll to the Wench for a celebratory meal and a room, and bought the room dear in silver. Then he changed his mind. He told Ostler they wouldn’t need it, and Ostler, unmoved (<span class="sc">“A room held is a room paid for in an inn this full”</span>), kept half of the silver. Jakal whispered to Spugnoir, and they slipped out the side door and through ditches and hedges to the woodcutter’s cabin, unobserved. He told Corl and Tad the whole of it, and Tad listened wide-eyed. In the loft Jakal studied the silver mace, and the runes hummed faintly against his palm, and he could not learn what they were for without a proper rite.</p>
+</section>
+
+<!-- ============================ PART SIX ============================ -->
+<section class="part" id="p6">
+  <h2><span class="num">Part Six</span>The Bravest Soul</h2>
+  <p class="when">World days 8–9 · played 1–3 October</p>
+
+  <p>After Lareth there was a lull. Jakal went to the keep gate and warned Rufus about Kobort and Turuko: their ambush at the crossroads, their keen interest in the fens. The captain promised riders on the northern road to Verbobonc and double scouts on the eastern track toward Nulb. Then Jakal went back down to the weeping willow on the green and sat. <span class="j">“I’ll just wait and pass the time. I feel something is going to happen.”</span> He waited several hours, and then several more, watching and noticing people. Nothing happened. Ostler, when he got back to the Wench, told him freight wagons had gone missing on the south road, that locals were barring their shutters, and that strangers had been asking after paths through the marsh.</p>
+
+  <p>In the common room he waited until he saw Dunstan, and sat by him at the hearth. They were not alone. Turuko was at the window, and Kobort on his bench, and a hooded stranger sat in the corner. Dunstan shielded their talk with his shoulder, and Elmo drank noisily to cover the words, and Kobort knocked a bench. Jakal kept his voice low and said what was on his mind. <span class="j">“What are you thinking, Dunstan? That stranger is intriguing. The villains are biding their time to strike, as usual.”</span></p>
+
+  <p>The room was too full of ears. Early in the afternoon Jakal rose.</p>
+
+  <blockquote class="said jak">
+    <p>Let’s take a walk on the green, Dunstan. I’d like a private word with you, without you know who listening in.</p>
+  </blockquote>
+
+  <p>Dunstan set down his mug and murmured, as he stood, that the moathouse lay out past the fens, which was no coincidence, and asked whether Jakal meant to go looking. Jakal made no answer. Elmo and Calmert stayed by the hearth. Across the floor Turuko’s dark eyes followed them, and big Kobort shifted on his bench, but neither rose. Gundigoot’s rag kept moving along the counter. The two men pushed through the door into the cool lane and turned toward the green, where the willow stands open and nobody can lean close without being seen. They walked to the open turf by the duck pond, far from tavern ears. And there Jakal said what he had come to say.</p>
+
+  <blockquote class="said jak">
+    <p>Let me speak plainly. Dunstan, you are the bravest soul I have ever encountered. You are honorable and strive to protect your friends. But in doing so you are often injured, and I fear that those injuries will accumulate and you will no longer be able to be the mighty warrior that you are. You are a trusted friend and I care about you. I don’t want to see you broken. I don’t know how to change the course the fates set for us, but I do know that I want you whole, standing in your strength when we all need you most. And most of all I want my dear friend to be well and live a long, good life.</p>
+    <footer>Marc, as Jakal, on Hommlet green — 2 October</footer>
+  </blockquote>
+
+  <p>Dunstan listened in silence, his hand resting on his sword hilt, glancing once back toward the Welcome Wench to be sure Turuko had not followed. The sun warmed the turf. There is a small strangeness in this moment of the record. Rounds in Greyhawk are simultaneous, so while Jakal was speaking, Dunstan’s own turn was already under way, and the first words the narrator gave him were about torches. <span class="sc">“We will not go into the fens blind. We need torches, rope, and bread first, and we should ask the woodcutter or miller where those wagons were seen.”</span> The answer to what he had just been given came a moment later.</p>
+
+  <p>Marc’s next line for Jakal was a question: <span class="j">“What are your thoughts on my words, if you care to share? I smile, but my smile cannot hide my concern for my friend. I look Dunstan in the eye and await his response.”</span></p>
+
+  <p>The sellsword’s guarded face softened into an honest grin. He gave Jakal’s shoulder a firm, companionable clap.</p>
+
+  <blockquote class="said">
+    <p>“The scrapes will knit, Jakal, and I’ll mind them better with someone watching my flank. Come on, then. Let’s see what torches, rope, and bread my purse will stretch to, and you can help me haggle with those Dyvers merchants.”</p>
+    <footer>Dunstan Mere</footer>
+  </blockquote>
+
+  <p>Jakal fell in beside him. Marc’s next line for him was short:</p>
+
+  <blockquote class="said jak">
+    <p>I follow Dunstan. He is my friend and a great leader. There is nobody else in this world that I’d rather follow and that I trust so completely.</p>
+    <footer>Marc, as Jakal, a moment later</footer>
+  </blockquote>
+
+  <div class="break">· · ·</div>
+
+  <p>The errand they were making now was Gunder’s. At the trading post Dunstan priced six torches and four days’ hard rations, and Rannulf asked a gold piece and four silver, and snapped that <span class="sc">“fools lose their loads toward the Nulb fens,”</span> and took a flat gold piece. At the watermill, Miller Mytch told them that Old Gunder’s two grain wagons had left three days earlier and been ambushed near the Nulb cutoff, two leagues south past the willow ford. Gunder had gone with two farm boys. There had been no search party, because Rufus kept the guards at the keep, and the family had little coin. <span class="j">“Thank you for your advice, miller. Much appreciated. We’ll get to the bottom of this, won’t we, Dunstan?”</span></p>
+
+  <p>Climbing the stony path to the church knoll, Jakal asked Dunstan what he had made of their talk on the green. Dunstan glanced over with a steady, quiet nod.</p>
+
+  <blockquote class="said">
+    <p>“I took it well, Jakal. A man doesn’t hear honest concern often in this trade. Having someone watch my flank means I might actually live to see grey hair.”</p>
+    <footer>Dunstan Mere</footer>
+  </blockquote>
+
+  <p>At the landing he muttered that if the Canon answered the door, Jakal should do the talking: <span class="sc">“He and I don’t get on.”</span> Calmert could not leave his duties; Terjon, from the dark chancel, had called for him to keep travellers out, and the young cleric promised to petition him after evensong. Spugnoir agreed to join. At the Wench Elmo was playing the sot over a tankard, and Dunstan covered the moment with loud bluster and two mugs of ale. They fixed the muster for sunrise.</p>
+
+  <p>They went to Gunder’s cottage on the south lane. An anxious woman stood watching the road by an empty cart-shed, and when they told her what they meant to do she came down to the gate in tears, grateful beyond words, and described her husband in his homespun coat, and the two grain wains, and the two lads. Jakal told her plainly that he would seek them at the Nulb cutoff and would not turn back while there was a trail to follow. She pressed her apron to her mouth, nodded, and then, because she had to do something, folded a heel of rye bread into his hand. <span class="sc">“St. Cuthbert keep you.”</span> Dunstan stayed at the gate with his cap in his fist.</p>
+
+  <p>At first light, in the woodcutter’s loft, he asked Spugnoir what a journeyman can cast in a day. <span class="sc">“Still only two dweomers of the first circle, Jakal. A journeyman’s mind widens slowly before it can grasp the deeper weaves.”</span> <span class="j">“We are going to have to find a way to discover those, my friend.”</span> <span class="sc">“Through lost tomes, forgotten crypts, or Master Burne’s extortionate fees. But we start by staying whole through today’s march.”</span></p>
+
+  <p>Then Jakal prayed. He asked Cuthbert for the path to wisdom, steadfast devotion, and divine grace, and he asked what deeds would help him grow. No thunder rolled through the roofbeams. The Saint of the Billet does not coddle his flock with idle revelations. But an austere certainty settled over him: wisdom is not bartered from books, and grace is forged by discipline and proven in trial. The road to spiritual mastery lay not in quiet contemplation alone but on the eastern track, where Gunder’s wagoners and captured farm boys waited for salvation from lawless hands. <span class="j">“I understood that my spiritual path lies in confronting the perils ahead and delivering the captured farm boys.”</span></p>
+
+  <p>Afterward Jakal took out the silver mace in the grey light from the open door and ran a thumb over its runes. <span class="j">“Sometimes a weapon like this only shows its true self in a real battle. We may see its power this day, if we catch whoever hijacked the wagon.”</span></p>
+
+  <p><span class="sc">“Or we may learn it is only a handsome club,”</span> said Spugnoir. <span class="sc">“Trust it no further than you have proved it, Jakal. Let the dweomers and our swords do the first work.”</span> Tad watched wide-eyed from the hearth. Corl, already lifting his axe, grunted that the fen was no place for fine words.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>They marched in order: Elmo ahead with his bow, Dunstan on point with sword and shield, Spugnoir and Jakal in the middle, Calmert at the rear. Down the south road they found a dead draught ox, scattered grain, and tracks two days old. Dunstan tried to surge ahead and sank to his knee when a bank gave way. Jakal spotted a wain, wrecked and mired in an alder clump.</p>
+
+  <blockquote class="said jak">
+    <p>Goblins! Those are our filthy ambushers. They’re small — be clever. We should take care. I follow Elmo and Dunstan’s lead.</p>
+  </blockquote>
+
+  <p>The wind brought woodsmoke and grease. Crouched in the gorse on a peat knoll, he saw them: six goblins quarreling over roast meat by a small fire, a lazy sentry leaning on a stump, and, bound back to back to a willow root, bruised but alive, Gunder’s two sons. Jakal whispered the plan. <span class="j">“Spug and I can sleep the six. The rest of you can take out the sentry. Agreed? We all need to act as one on Elmo’s signal.”</span> And to Spugnoir: <span class="j">“Then you cast the sleep. I’ll throw a knife at the sentry if I can get a clear shot.”</span></p>
+
+  <p>The signal came. Elmo’s arrow dropped the sentry. Jakal’s thrown knife deflected off a willow branch and thudded into the stump. Spugnoir’s magic put all six goblins to sleep around the fire, and Dunstan and Calmert ran down the slope. Jakal bound the six with cord and found a pouch of twenty-two silver. Then he turned to the boys. <span class="j">“Boys, where is the man you were with?”</span></p>
+
+  <p>The boys, whom the narrator calls Will and Eldred (Elgiva had named them differently at her gate, and the record never settles it), said between sobs that their father had been struck down by the ditch.</p>
+
+  <p>Jakal swore that Gunder would be carried home for proper rites. <span class="j">“We go back to search for Gunder. If he has perished we need to bring his body back with us so proper rites can be held.”</span> Beside a splintered wagon bed, Elmo parted the alders and called a halt. In the stagnant ditch, half submerged in the foul water, lay old Gunder in his coarse homespun coat, a heavy blow having crushed the back of his skull. Before Jakal could turn the boys, they slipped past him and saw. Will’s cry cut across the fen and Eldred’s face went white and still. Dunstan knelt and closed the yeoman’s eyes. <span class="j">“I said he would come home with us.”</span> He told the company that Gunder would be wrapped decently, and the rites spoken.</p>
+
+  <p>Dunstan covered Gunder’s face with his wool blanket and hacked down two stout alders with his arming sword, and bound the cloth between them into a litter. Jakal stepped into the foul water of the ditch to heave the cold, heavy body onto the boughs; he and Calmert lifted the poles. Spugnoir prodded six roped goblins into a stumbling file. Elmo ranged ahead for the firmest ground. Eldred kept an arm around Will. The march back through the willow bottoms was quiet but for the squelch of boots in the peat and the prayers Calmert murmured for the dead.</p>
+
+  <p>At the wattle gate Mistress Elgiva was waiting. Jakal stepped back so that she could reach her husband. She wept over the blanket and held her sons.</p>
+
+  <p>Quietly, afterward, he drew the others aside and asked whether they should give her the sack of goblin silver, saying it was the least they could do. Calmert nodded, murmuring that the Cudgel looks kindly on aid to the fatherless, and Elmo and Spugnoir agreed at once that the raiders’ coin belonged here. Dunstan bowed his head to the widow. <span class="sc">“I’m sorry for your man, mistress. We were too late for him.”</span> Then he offered to march the six goblins up the ridge track to Captain Rufus himself, if Jakal preferred to stay with the family. <span class="j">“Please do, Dunstan. I appreciate that.”</span> Jakal pressed the twenty-two silver pieces into the widow’s trembling hands. No handful of fen silver could mend a broken wain or bring back a herd or lift the burden fallen on two young boys. He sat beside her on the porch step and listened while she poured out broken memories of Gunder’s hard labour and her dread of the coming winter. Calmert stood in solemn vigil with bowed head. Dunstan and Elmo marched the goblins out the gate toward the ridge.</p>
+
+  <p>Inside, Elgiva brought a basin and he helped her wash the body with cool well water and linen, while Calmert traced the Cudgel’s sign. Then Jakal laid a gentle hand near Gunder’s folded arms.</p>
+
+  <blockquote class="said jak">
+    <p>I say a prayer over the man’s body, asking that he be granted the grace of everlasting life. He was a good husband and father who worked to support his family. An honest man who will be missed by all.</p>
+    <footer>Marc, as Jakal, in Gunder’s cottage</footer>
+  </blockquote>
+
+  <p>At the Wench, before noon, he told Ostler what had happened in a voice that was solemn. <span class="sc">“Gunder was a good man and an honest neighbor,”</span> Ostler said. <span class="sc">“The gods rest his soul, and Cuthbert take those fen rats.”</span> He poured them ale and would not take a coin.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>That same dusk he did something small, and it is the kind of small thing that makes a story. At Corl’s hearth he asked Corl whether Tad might come out with him under the night sky. <span class="j">“Things look different under the night sky,”</span> he said. <span class="j">“It would be good for him to learn how to look.”</span> Corl allowed it, within call of the door and away from the thick timber. Jakal showed the boy to soften his gaze and look a little to one side of the dark, to catch movement. The boy strained so hard at first that a swaying hazel bush startled him; but he softened, and soon saw the low flight of an owl.</p>
+
+  <p>Jakal cast Detect Magic across the clearing and found nothing but the glare of the silver mace and his own gear. He told the boy so, honestly. Then he told him the next thing.</p>
+
+  <blockquote class="said jak">
+    <p>There is no magic aside from us right here now, Tad. But know this: there is magic in your heart that you will come to know as you and the magic grow. You will understand in time, young one. Let’s head inside and enjoy some of your father’s porridge.</p>
+  </blockquote>
+
+  <p>The boy took him with great literalness. He pressed a hand to his tunic to feel for a pulse of power.</p>
+</section>
+
+<!-- ============================ PART SEVEN ============================ -->
+<section class="part" id="p7">
+  <h2><span class="num">Part Seven</span>An Oak, a Ditch and a Fever</h2>
+  <p class="when">World days 9–22 · played 3 and 13–14 October</p>
+
+  <p>Then the log goes silent for ten days. Marc did not play Jakal between 3 October and the early hours of the thirteenth, and since a world’s clock turns on its players’ turns, in the world itself the next moment follows the last: one evening, from porridge to a question about a cellar. Jakal is in Corl’s cabin, asking whether there is one.</p>
+
+  <p><span class="sc">“No cellar here, scholar. Ground’s too wet near the brook, and rock sits close beneath the loam. Just a cold-hole dug under the flags by the pantry for salt pork and turnips, scarcely two feet deep.”</span> If he wanted cool storage or deep stone, said Corl, he would have to look to the inn’s vaults or the cellars at the keep. What Jakal meant to put in a cellar, the record does not say. He went out to find a tree.</p>
+
+  <p>He climbed a great oak at the forest edge, up through the fork, to a bough fifteen feet above the grass, where the trunk had a knot-hole as deep as his forearm, narrow, clean and sheltered from the weather. He took a copper piece from his purse and slid it into the dark. It clinked softly on dry wood. Then he leaned his forehead against the furrowed bark and, in a quiet murmur beneath the rustle of the upper leaves, thanked the oak for sheltering him and asked it to keep his small token hidden. The wood was cool and silent under his hand. No mystical hum stirred in the heartwood, and no sign answered from the canopy. But the broad boughs cradled him in the dark, and from there he could see the chimney of Corl’s cabin breathing pale smoke into the crisp night air, and the lights of Hommlet glowing among the trees like quiet embers.</p>
+
+  <p>He came down in a mood for construction. Dead limbs lay where the old oak had shed them, and he dragged the stoutest to the cabin wall, testing each with his boot for rot, and built himself a lean-to against the woodpile. The record is clear about what happened next, because Jakal wrote it down with admirable honesty. <span class="j">“The wood had dry rot at the core. When I pressed my weight against the frame to test its hold, the main bough snapped, dragging down an avalanche of split firewood on top of me. A heavy log scraped my hand and the whole shelter collapsed into kindling across the yard, making a terrible clatter in the quiet night.”</span></p>
+
+  <p>He scrambled to gather the logs and restack them before anyone could see. Corl came out with a tallow candle. Jakal told him he had tripped. Corl, sour with irritation, warned of beasts and ordered him up the ladder to the loft, and Jakal, on the way, slipped on a rung and fell two rungs and battered his shins. He lay in thin, draughty hay with throbbing hands and bruised ribs, in what his own memory calls a miserable, wakeful rest.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>He had a different instinct about the Wench. In the morning he asked Ostler about the inn’s cellars and whether he might go down and check that they were secure. <span class="sc">“The cellars are stout cut limestone, Master Jakal, vaulted under King’s stone and barred with three-inch oak.”</span> The two dark men by the window had made him nervous. He whispered as much, and Ostler, with the full volume of a man whose bread is burning, answered him aloud: <span class="sc">“Not now, scholar. The cellar has held thirty years without giving an inch, and it won’t crumble before the breakfast rush clears. Drink your brew or sit quiet.”</span> Turuko, who had overheard, smiled. A little later Ostler took him down himself, snuffing a tallow stub, and showed him the vaulted limestone and the iron-barred bulkhead on the east.</p>
+
+  <blockquote class="said jak">
+    <p>This is the stoutest cellar I’ve ever been in, Ostler. It’s practically fortified!</p>
+  </blockquote>
+
+  <p><span class="sc">“Built by dwarf-masons,”</span> said Ostler from the rungs above, <span class="sc">“when the old Viscount fortified the road. Good stone keeps the ale cool and thieving hands out.”</span></p>
+
+  <p>The rest of the morning was a walk. He went out onto the village green and asked to be told what he could see, and the narrator described the sturdy houses around it one by one, and he set off west on foot, paying attention to the details and the people. From a leatherworker named Jakk Bunt he bought a pair of ox-hide boots for twelve silver; the man advised him to rub tallow into the tongues before he waded the marsh muck. At the smithy Brother Smyth had finished the thing he had promised: <span class="sc">“The third throwing knife is reworked — cut the cracked tang down and pinned it into seasoned ash with brass wire. And while drawing brackets for Rufus’s ramparts, I hammered three heavy iron darts out of the sheared billet ends. The dagger is two gold, as we spoke of before. The three darts you can take for twelve silver bits.”</span> He walked on, to the wheelwright, to ask about the gossip. The wheelwright’s was the one he would remember.</p>
+
+  <blockquote class="said">
+    <p>“I’ve shod their wheels, that’s all I know for certain. Iron-banded hubs, double axles, beds bolted stronger than any hay wain needs. Davl paid in good silver, in advance, and told me not to ask what would ride on them. Gremag’s men came for the last set after dark, with the lamps shuttered.”</p>
+    <footer>The wheelwright</footer>
+  </blockquote>
+
+  <p><span class="j">“Heavy night wagons? What are those? And what did — parts? That’s very strange.”</span> They were going south, the wheelwright said, with muffled hubs and no lanterns, along the same road where Gunder had been ambushed. Jakal did not need to be told what that meant. He walked to the churchyard wall, out of the Canon’s hearing, and found Dunstan. <span class="j">“What do you think? I’m guessing they carried weapons and armor to Nulb.”</span> Dunstan agreed they probably had. <span class="j">“We should bring Elmo in on this and speak to the mage and Rufus.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>The tower would not have him. At Burne’s door a halberdier told him Dunstan was inside the keep, under the Captain’s order, <span class="sc">“and he’s no business of a hedge-scholar’s.”</span> Jakal knocked again, to tell the man that he and Dunstan were friends and the mage would not like any delay. <span class="sc">“Keep your hands off the oak,”</span> the halberdier said. Oswin Hale told him at sundown that the council had ended before dark, that Burne was shut in his study, and that Dunstan had left a quarter-hour earlier for the smithy. He found Dunstan there at Smyth’s apron, went back to the woodcutter’s and slept through, and some days later returned to the tower.</p>
+
+  <p>In the bailey he shared what he had learned and asked what Rufus and Burne meant to do. Dunstan said it settled the stink of it. Rufus had patrols on the north and east tracks, but the true boil was gathering down south at Nulb, and Davl was feeding it. Burne and Rufus were weighing whether to confront Davl’s shop directly or mount a campaign toward Nulb. <span class="j">“I’m concerned we have spies in the tavern and our traders supplying the evil forces. Those both need dealing with.”</span> The answer was caution: hit Davl too soon and the snakes in Nulb would know before Rufus could set his trap, and Turuko was not the sort to sit quiet if he smelled one. <span class="j">“Well. What should we do?”</span> Jakal asked. Elmo answered.</p>
+
+  <p><span class="sc">“We don’t force a brawl. We play it canny. Davl moves wagons when the lanes clear, and Turuko sits by his ale waiting to see who comes and goes. We can either bed down early and let Master Burne and Rufus weigh the reports come morning, or we post ourselves in the shadows near the crossroads — watch Davl’s yard without showing iron, and see who slips out before midnight. … But if we watch, we watch quiet.”</span></p>
+
+  <p>When the woodsman had finished, Jakal said, <span class="j">“I’m thinking we hide in the shadows and watch tonight.”</span> <span class="sc">“That’s the sensible road,”</span> said Elmo. <span class="sc">“The hedgerow behind the cooper’s shed gives a clean sightline into Davl’s back wagon-gate and the crossroads lane. We keep out of sight, no lanterns, and no drawing steel unless they force our hand.”</span></p>
+
+  <p>So the three of them took a thorny hedgerow in the dusk. Elmo snapped a branch on the way in. A blackthorn tore Jakal’s collar. Freezing mud soaked through to his thighs. After midnight the sky thickened into sleet, and cold water pooled through his woolens and seeped into his boots, numbing his legs until every knuckle and joint ached. Across the lane, Rannos Davl’s palisade was a sullen, shuttered wall of wet timber. No gate opened. No muffled cart rolled forth. By the third watch violent tremors had seized him, and his ribs burned with every breath, and a deep racking cough took hold in his chest that he could barely choke back against the sodden ground.</p>
+
+  <p>The record gives the verdict in his own words. <span class="j">“The trading post stayed locked and silent the entire night, while the exposure brought on severe chills, fever, and a racking chest cough.”</span> In the grey of the dawn, Dunstan and Elmo hauled him out of the ditch and took him to the Wench, where Ostler laid thick sheepskins before the roaring hearth and gave him a hot posset, which set him coughing more. Jakal slipped round to the kitchen postern, out of sight, and cast his healing prayer on himself, once and then a second time. His ribs mended. The ditch-fever and the raw congestion stubbornly remained.</p>
+
+  <p>So he did what an herbalist does. <span class="j">“I go to the woodcutter’s and collect willow bark. I make a tea of it and drink it, and then go up to my loft to rest the day and night to recover.”</span> By morning his lungs were clear.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>It was the church he could not mend. He had gone to the side door while the fever was on him and knocked, and Calmert had come, whispering, to say that the Canon had forbidden him to give Jakal herbs or divine rites. He had told him to brew willow-bark. It was only afterward, when Jakal caught the young cleric alone on the gravel path with an empty willow basket, that the reason came out.</p>
+
+  <blockquote class="said jak">
+    <p>I’ll see if I can talk to Calmert discreetly. Does Terjon know I’m a cleric of St. Cuthbert?</p>
+  </blockquote>
+
+  <p>Calmert glanced back toward the knoll, relieved to find nobody watching. <span class="sc">“The Canon knows your prayers, brother, but he names you an unsanctioned hedge-priest who pollutes the Cudgel with sorcery.”</span> It was not that Terjon failed to see what Jakal was. It was that he saw exactly. A recognised brother of the cloth did not carry a spellbook. The only road to reconciliation led through Verbobonc, through renouncing his arcane studies before the high clergy and submitting to monastic oversight, and Calmert said, grimly, that he could see no hope of it while Jakal carried a spellbook.</p>
+
+  <p>The record does not say why Jakal chose Verbobonc. It says only that Calmert had just named the city as the seat of the clergy who could sanction him, that Jakal then went looking for Spugnoir to talk dweomers, and that a little later Marc asked whether Hommlet had a horse stable.</p>
+
+  <p>It had none to sell that day. Jakal said that he would travel to Verbobonc on foot, then, unless there was other transport. <span class="sc">“You’ll find neither wagon nor carter rumbling north today, scholar. The torrential rains over the past ten days have turned the hollows near Emridy Meadows into boggy grease. Old Mytch hauled his team back before sunrise — broke an axle clean through in a wash-rut two leagues up, and swore he wouldn’t turn a wheel toward Verbobonc till three days of sun bake the clay. If you have business in the city, your own two ox-hide boots are the only carriage leaving Hommlet before the weekend.”</span> He asked Spugnoir whether he would come. Spugnoir flatly refused to trudge through flooded fen mud.</p>
+
+  <p><span class="j">“Understood,”</span> Jakal said. <span class="j">“I’ll travel on my own.”</span></p>
+</section>
+
+<!-- ============================ PART EIGHT ============================ -->
+<section class="part" id="p8">
+  <h2><span class="num">Part Eight</span>The Lord of All Magics</h2>
+  <p class="when">World days 22–29 · played 14–15 October</p>
+
+  <p>The north road was a broad trough of clay and grey standing puddles. The rains had chewed the verge into soup, and Jakal’s new ox-hide boots plunged calf-deep with every stride, but his pace held. At one point he slid into a ditch. At the end of three days of steady marching he paid two copper at the iron-bound South Gate, where the halberdiers of Verbobonc cast an incurious eye over his mud-splashed robes and plain ash staff and waved him through the portcullis.</p>
+
+  <p>The city swallowed him in a din of cobbles and high timbered gables and shouting hawkers, and the smell of roasting grain and river mud. He asked his way of a clerk near the wool-market and climbed to the Upper City, where, flanked by cypress trees and austere grey columns, stood the Hall of the Uncaring. The Temple of Boccob. Its broad stone stairs led up to quiet vaulted bronze doors, and beyond them lay the famed library.</p>
+
+  <p>The air inside hung heavy with cedar oil, aged calfskin and dry ink. After the rustic squalor of Hommlet, the vast silence of the temple felt immense. By a reading lectern carved with the eye within a circle, a young acolyte in indigo-dyed robes was trimming a tallow candle with a silver snip. Jakal went to him and asked what a man must do to become a follower of Boccob.</p>
+
+  <p>The acolyte took in the scholar’s satchel, the bruised knuckles, the traveller’s ash staff. He set his snips aside with a calm, measured bow.</p>
+
+  <blockquote class="said">
+    <p>“The Lord of All Magics requires no fanatical vows. Unlike the rigid folk of the Cudgel, Boccob turns none away who seek knowledge and master the Art. You may study, tithe, and seek novice initiation under Master Eldon at the chancel.”</p>
+    <footer>An acolyte of the Temple of Boccob</footer>
+  </blockquote>
+
+  <p>A druid had told him to his face that he could not be both, and a canon, by way of Calmert, would have said the same. Here nobody asked him to choose. With the acolyte, whose name was Eldred, he knelt before a granite altar, and he set his ash staff aside. The record gives what happened in his own voice. <span class="j">“A calm and cool certainty settled through my spirit, reconciling my divided callings into a single harmonious path.”</span></p>
+
+  <p>Then he went to work. He counted out twenty-five gold crowns onto Eldred’s cedar board and chose a scroll of <em>Charm Person</em>. Eldred brought the unrolled vellum and explained the spell: it clouded the reason of a single two-legged person, so that they regarded him as a trusted comrade, but it could not bend beasts, undead or monsters, nor compel anyone to take their own life. If harm was offered by Jakal or his fellows, the dweomer shattered instantly, and those of strong will might throw it off in time. Jakal dipped his quill to copy the sigils into his grimoire, and the heavy ink clogged at the nib, and a blot spattered the margin and soaked through the leaf.</p>
+
+  <p>Eldred shook his head mildly. <span class="sc">“Patience serves the Uncaring.”</span> The replacement sheet cost an extra silver. A burr on the nib dragged a tail across the closing sigil, and it took three-quarters of an hour with a bone scraper to put right. Then he put a question to Eldred, the one the oath of twenty-two days before had been waiting for. He asked how one goes about creating new spells, eager to learn how magic might be expanded as it ought to be.</p>
+
+  <p>Eldred halted in replacing the master roll on the shelf, and turned slowly. His pale eyes fixed him with a cold, unforgiving stare.</p>
+
+  <blockquote class="said">
+    <p>“To shape a dweomer unwritten is the pinnacle of the Art. It is not a craft for initiates who still blot their leaves copying another man’s cantrips. The High Magisters spend years in sealed laboratories, burning rare tinctures and gems by the bushel, outlaying thousands upon thousands of gold pieces for weeks of uncertain calculation — and half of those who dare it burn their minds out or perish when the weave fractures in their grasp. Until your Art reaches full mastery, such ambition is merely suicide or madness. Boccob preserves all knowledge, but he does not suffer fools to waste his gifts.”</p>
+    <footer>Eldred, acolyte of Boccob</footer>
+  </blockquote>
+
+  <p>He turned his back and closed the cedar press. Jakal bought nine sheets of vellum and ink for nine gold, and copied <em>Shield</em> as well. Then he thanked Eldred, and swore to uphold the practice of magic. He asked, as an afterthought, whether a devout follower of Boccob might gain new prayers.</p>
+
+  <blockquote class="said">
+    <p>“The Arch-Mage of the Gods demands no blind obedience, nor does He bar your hands from the wizard’s ink. The divine rites granted to His priests flow from clarity, discipline, and understanding. Your daily measure of prayers does not multiply merely by naming His name at an altar. It deepens as your comprehension of the universe matures through trial and deed. Yet in Him, you may seek every rite of wisdom and protection without fear of hypocrisy.”</p>
+    <footer>Eldred, acolyte of Boccob</footer>
+  </blockquote>
+
+  <p>A tranquil certainty warmed his chest. The path was clear. Then Jakal told Eldred everything he had learned in Hommlet, about the moathouse and the temple. Eldred was not interested.</p>
+
+  <blockquote class="said">
+    <p>“The Lord of All Magics weighs neither the triumph of the Cudgel nor the malice of the cult. The rise and ruin of temples are but dust upon the scales of time. Keep your voice down, initiate. The scriptorium is a house of quiet study, not a council of war. If you seek allies for a crusade, you have brought your words to the wrong altar.”</p>
+    <footer>Eldred, acolyte of Boccob</footer>
+  </blockquote>
+
+  <div class="break">· · ·</div>
+
+  <p>It was another three days back to Hommlet, and he sought out Spugnoir at once with an idea: that they trade what each of them knew. <span class="sc">“You went to the temple city alone,”</span> Spugnoir said. <span class="sc">“Show me what the library gave you, Jakal.”</span> Jakal laid out his new pages. Spugnoir inspected the archival script with keen admiration. Then he drew out his own spellbook and set it down, offering Jakal both <em>Burning Hands</em> and <em>Read Magic</em>, and began to copy <em>Shield</em> himself, because, he said, <em>Magic Missile</em> he had carried since his days in Dyvers, <span class="sc">“but <em>Shield</em> — that is a different matter entirely. An arcane aegis against quarrel and dart is worth its weight in silver to any man who wears no mail.”</span></p>
+
+  <p>It was the oath at work, in a small way: two young mages across a pine table with ink and vellum and a lamp, trading knowledge freely. By late afternoon his <em>Read Magic</em> leaf was dry; he trimmed the margins, pierced the fold with an awl, and stitched it into his grimoire. As the room dimmed, he came to <em>Burning Hands</em>. Fatigue dulled his wrist. A heavy drop of ink spattered across the fan-formula and blurred three crucial runes.</p>
+
+  <p><span class="sc">“Rest your hand,”</span> Spugnoir warned, blowing on his finished ward, <span class="sc">“before you waste more costly skin in the dark.”</span></p>
+
+  <p>He did not rest long. Later, he did what a careful man does and checked that every page was secure. He took the spine between his thumbs and tested the tension of the newly set gatherings, easing each folded leaf to see that the waxed cord held. As he tugged at the gutter of the <em>Burning Hands</em> folio, the knot gave a sharp pop. The stiff cord, drawn too tight against freshly trimmed vellum, sheared straight through the needle-holes like a hot wire through lard.</p>
+
+  <p>The inner margin tore down its crease, and the whole double leaf slipped loose into his palm, with jagged remnants of vellum fluttering along the exposed hemp of the spine. Spugnoir winced at the dry sound, his hand frozen over the inkhorn. The diagram and the phonetics were intact; but the sheet lay entirely unmoored from the book. Jakal reached for his shears. Spugnoir stayed his hand, and handed him parchment and horn glue, and he cut a narrow calfskin guard strip, set it under a weight to dry, and re-punched and restitched the folio.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>Later, with the book mended as well as an evening’s work could mend it, he counted his gold and gems. <span class="j">“Yeah, I donated a lot at Boccob’s temple,”</span> he said, laughing. <span class="sc">“Aye, the archivists in Verbobonc never part with ancient ink for love alone,”</span> said Spugnoir. <span class="sc">“Though by the look of your grimoire, you bought sounder formulas than you spent in coin. Still, coin talks loud in the common room below. Dunstan and Elmo have been nursing their cups down by the chimney all afternoon.”</span> <span class="j">“And we’re both better off in our arcane knowledge. A fair trade all around! Let’s join Dunstan and Elmo and see what the situation is.”</span></p>
+
+  <p>The situation was a long table and a hostile room. <span class="j">“So what do we do in the meantime?”</span> Jakal asked, and Elmo told him: <span class="sc">“We eat Ostler’s mutton, we sleep in a dry bed, and we don’t go lurking near the trading post in broad daylight. Burne’s riders have the road under eye. If Davl’s teamsters so much as hitch an ox after dark, Rufus will send word down to the stables. Until then, you sit on your hands and look like travelers minding their own silver.”</span> Jakal told them about Verbobonc. He watched what Turuko was watching. And then, as he had at the start of the month, he could not leave a corner alone.</p>
+
+  <p>In the shadowed booth a cloaked traveller sat with a cider mug and his hood low. Jakal crossed the rushes, screening the booth from the window table, and said in a quiet, measured murmur, <span class="j">“I am Jakal Hierophant, a student of the arts and rites. Peace to your evening, traveler.”</span> Kobort began to heave himself up, and the brute’s hip caught the trestle and slopped his ale. The traveller did not lift his cowl. <span class="sc">“I told you before I want no company,”</span> he rasped.</p>
+
+  <p><span class="j">“Understood,”</span> said Jakal. <span class="j">“These are strange times, though, and you are an unanswered question.”</span></p>
+
+  <p>The cowl tilted an inch, and cold grey eyes fixed on him like iron nails. A hand shifted beneath the cloak, and Jakal heard the faint muffled clink of fine chain mail.</p>
+
+  <blockquote class="said">
+    <p>“Then let it stay unanswered, scholar. Men who pry into corners in this country have a habit of choking on their own spit in a ditch. Turn around and drink your ale while your boots are still dry.”</p>
+    <footer>The cloaked traveller</footer>
+  </blockquote>
+
+  <p><span class="sc">“That’s enough hovering by dark corners!”</span> Ostler slapped a rag onto Turuko’s table with a crack like a pistol shot. <span class="sc">“Sit down or clear the aisle.”</span> Jakal sat. He had glimpsed, beneath the folds, the pommel of a chased silver dirk; Spugnoir, when he told him, said the work was Dyvers river-guard steel. And then, because Jakal could not help himself, he leaned in, scraped his chair back across the hearth flagstones with a harsh grating screech to mask his voice, and whispered a question about the traders.</p>
+
+  <p>The clatter rang across the taproom. Across the room Turuko’s narrow eyes fixed directly on him. Beneath the trestle, Elmo’s heavy boot drove hard into his shin. The woodsman did not smile, and he did not cough.</p>
+
+  <blockquote class="said">
+    <p>“Keep your teeth together, fool. The wheelwright told you straight: reinforced axles and muffled night-hauls heading down the marsh road. Who else in Hommlet buys wagon grease by the cask and moves iron south in the dark? Now shut your mouth before that Baklunish bastard counts the teeth in your jaw.”</p>
+    <footer>Elmo Thistlewood</footer>
+  </blockquote>
+
+  <p>Jakal went up the stairs.</p>
+
+  <p>That night he left through the kitchen postern, and walked south along the drainage ditch under the frosty stars to Corl’s cabin, and slept in the clover hay. At about three in the morning, he woke. The air in the loft bit at his cheeks. He gathered the two split halves of the ash staff that Kobort had broken over his knee, and the heavy iron poker he had taken from the moathouse dungeon, and the dead man’s rotted purse, and went down the ladder in the pitch black. His boot slipped on a frost-slick rung, and the poker struck the rail with a ring that hung in the dead silence. He crossed the frosted grass to the great oak, crouched in the tangled roots, and wedged all three into the shadowed cleft, scraping his knuckles on frozen bark. The sky was pitch-black and thick with cold stars, and his breath smoked white. <span class="j">“Near the big oak I leave my broken staff, the dead man’s purse, and the iron poker.”</span> The record does not say why.</p>
+
+  <p>Then he went back up to the loft to wait for dawn, and when it came he took out his spellbook and began again from the beginning. <span class="j">“I carefully remove every sheet of vellum from my spell book. I look over each spell carefully: Magic Missile, Sleep, Charm Person, Shield, Read Magic. Are there any other spells? Then I very carefully rebind each spell vellum into my spellbook. I work slowly and extremely carefully. If anything feels slightly wrong, I stop immediately.”</span> He cut the waxed cords with steady care. Six dweomers in all lay out in the pale morning light. He threaded fresh flax through the awl-holes. His stiffened thumbs fumbled the tension, and the thread frayed against a burred hole, and the leaves held, but the spine bound stiffly, resisting when opened flat.</p>
+
+  <p>So he did it again, more slowly. <span class="j">“I very carefully and deliberately repeat the process.”</span> He read each spell over before he rebound it. Shield, with its geometric angles of deflection. Burning Hands, traced in vermilion ink. The sweeping arcs of Sleep. The harsh, concise runes of Magic Missile. The curling ligatures of Charm Person. The analytical glyphs of Read Magic. He murmured the syllables of each in turn. And then, in the biting cold, his stiff fingers fumbled the stitch, and the knot caught, pulling hard on the inner gutter of the <em>Burning Hands</em> folio, and the needle-hole stretched wider than it should. He paused. He drew the remainder snug. The spine, the narrator wrote, bore the strain of too much unsewing.</p>
+
+  <p>His own memory is blunter. The thread, it says, had widened an existing needle-hole and begun tearing into the gutter margin. In the end he left <em>Burning Hands</em> and <em>Shield</em> loose between the sewn gatherings. The book would want proper bookbinding paste.</p>
+
+  <p>That morning he counted his purse: twenty-one gold, nine silver, four copper, and the two carnelians from the moathouse. He tossed the purse up in the air several times, and caught it, feeling the weight. He tied it and untied it and put it back on his belt.</p>
+</section>
+
+<!-- ============================ PART NINE ============================ -->
+<section class="part" id="p9">
+  <h2><span class="num">Part Nine</span>The Recruit</h2>
+  <p class="when">World days 29–30 · played 16–22 October</p>
+
+  <p>It began at the watermill, with flour dust and the grind of the stones. Miller Mytch heaved a sack of grist onto the staging block and told Jakal what he had seen that morning: a cloaked stranger with a cut cheek, hurrying south toward the fens not an hour before, and armoured ruffians prowling the swamp cut toward Nulb. <span class="j">“That’s not good,”</span> Jakal said over the rumble of the stones. <span class="j">“I’ll investigate. Thank you, sir.”</span> <span class="sc">“Watch your back out there, master scholar,”</span> the miller called. <span class="sc">“A lone traveler on the marsh track with rough men lurking is just asking for an iron tip in the ribs. If you mean to chase that cut-faced fellow south, don’t dawdle. He had a good start on foot, but he was favoring his side.”</span></p>
+
+  <p>The chase that followed is told in the record in small pieces. Jakal found Dunstan crouched at the briars behind his banded shield and Spugnoir waiting under the elder boughs. In the mud he spotted a scrap of torn grey wool and a clear trail of blood. Spugnoir said the quarry was the cloaked rogue from the taproom with the Dyvers dirk, an assassin named Whistling Pete. They caught the limping man before the willow fens, whistling thinly through his teeth. Jakal planted his ash staff in the road verge and, in the words of his own memory, <span class="j">“demanded Whistling Pete drop his weapon and name his master.”</span> Pete tossed his bodkin away and named two men: Rannos Davl and Gremag. Jakal bound his wrists with Dunstan’s hemp rope. As they marched him past the crossroads, Gremag watched from the doorway of the trading post. Before Captain Rufus, the prisoner was sent down to the lower cells. <span class="j">“A sense of accomplished justice settled over me.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>Rufus told them he would send a corporal and four men to secure the trading post and summon its merchants for questioning, and released Jakal and Dunstan from immediate duties. Jakal decided to wait at the keep gate an hour <span class="j">“to meet the newcomer who arrived recently.”</span> No newcomer came. He went down to the east trench where the ditchers worked, and stood among them through the noon horn, and looked for a face he did not know. Nobody was there. He went on to the Welcome Wench and pushed through its front door.</p>
+
+  <p><span class="sc">“Wipe ’em clean, scholar,”</span> said Ostler, <span class="sc">“or take your boots to the pump.”</span></p>
+
+  <p>Late that afternoon, in a corner of the taproom, a clay-spattered ditcher was failing to wake Elmo. Jakal went up to him and introduced himself. He was a young man with sunken, weary eyes, and he said that his name was Thran, and that he was an honest tradesman, a builder and a cook. Jakal offered him what he had to offer: an equal share of all spoils, marching alongside Dunstan and Spugnoir. He admitted he had no spare harness. Behind him Kobort rose to follow them out, and walked into a table leg, and Ostler checked him with a look.</p>
+
+  <p>They looked for Dunstan across the green at dusk, but the smithy was dark and the church barred. On the way, Jakal told Thran what he had learned about the company he was joining. Discipline, steadfast vigilance and cold wits, he said, were what kept a man breathing. Thran asked about a bed. Jakal said that Gundigoot demanded three silver pieces merely for loft straw, and spoke of following through time and the vision of what lies ahead, and Thran went off to sleep in the lean-to by the mill.</p>
+
+  <p>Jakal found him there in the dusk, in the straw, clutching a loaf of bread. He ducked under the low eaves, his staff tapping on the planking, and asked a strange question.</p>
+
+  <blockquote class="said jak">
+    <p>You don’t know who I am, do you?</p>
+  </blockquote>
+
+  <p>Thran blinked at him from the chaff and shook his head slowly. <span class="sc">“I know you gave me your name on the church steps, master. Jakal, you said. Beyond that, I don’t know you from the ditchers at the trench. I’m just looking to sleep in the dry, if it’s all the same.”</span></p>
+
+  <p>It is an odd moment in the record, and it is told here as the record has it. At the mill, Jakal asked Thran to walk with him to the willow pond. In the chill mist, he said that although he appeared as Jakal, Thran had known him far longer, in other worlds. The ditcher blinked and took half a step back, as if Jakal had spoken in a fever tongue.</p>
+
+  <blockquote class="said">
+    <p>“I know nought of other worlds, master scholar. I only know the mud underfoot, and that Dunstan won’t be sitting in a frozen ditch. The Welcome Wench is where men go when dusk comes. Kobort and his lot might scowl, but there’s light, Ostler keeps order with his fists, and every drop of news in Hommlet runs through that taproom.”</p>
+    <footer>Thran</footer>
+  </blockquote>
+
+  <p>On the gravel porch of the Wench Jakal said, plainly, into the chill air: <span class="j">“This is Oerth, not earth.”</span> The ditcher looked at him as if he had spoken in ancient Suloise, and shouldered into the warmth. Kobort and Turuko glared from their trestle. Jakal, who had said too much, smoothed it over with Ostler (<span class="j">“Pardon the lad’s haste, Master Gundigoot — we mean no disrespect to your hearth”</span>) and led Thran out before a brawl began. He rebuked him sharply for an idle distraction. Walking south toward Corl’s a little later, he set aside the sharpness and spoke honestly instead: of his graduation from the academy, his dedication to Boccob, and the harsh lessons of vigilance and fellowship won in the fen. <span class="j">“I’m staying with the woodcutter,”</span> he said. <span class="j">“You can come with me.”</span></p>
+
+  <div class="break">· · ·</div>
+
+  <p>That evening he told Spugnoir to wait in the woodcutter’s yard. <span class="j">“I have to go meet someone. Wait here and I will return shortly,”</span> he said, and set off toward the keep. He climbed the rutted ridge path in the dusk. The keep doors were barred fast, and the watchman would not open before sunrise. He started down again in the pitch dark, and a frozen rut caught his foot, and he fell heavily into the cold mud and wrenched his ankle.</p>
+
+  <p>He limped to the empty green in a bitter wind. He knelt in the frozen slush, laid a trembling hand against his throbbing ankle, and began the prayer of restoration, calling on divine favor to knit the wrenched joint. The record is exact about what came next.</p>
+
+  <blockquote class="said">
+    <p>But as the sacred syllables leave your lips, a sickening jolt of discordant power shocks back through your marrow. Instead of soothing warmth, a blinding spasm of fire tears through the tendon, seizing the ankle in vicious, locked agony that wrenches a gasp from your throat. The invocation dissipates into the freezing mist, completely spent.</p>
+    <footer>The narrator, to Jakal</footer>
+  </blockquote>
+
+  <p>He went down on his good knee in the mud, his staff slipping on the icy peat. The record gives no cause. Then Marc, as Jakal, asked: <span class="j">“Do I have the ability to cast a healing prayer?”</span> The answer came from inside. The morning’s devotion had not vanished with the stumble. Beneath the jar of the miscast words the reservoirs were deep and sound. Since the altar in Verbobonc his spirit commanded far more than a novice’s: several first-circle healing prayers remained in his mind, alongside a deeper, second-circle rite of restoration that he had not yet called on.</p>
+
+  <p><span class="j">“I will cast the rite of restoration.”</span></p>
+
+  <p>He steadied his breathing, pressed both hands over the joint, cleared his mind of the jarring misstep, and invoked Boccob’s balanced grace. A cool steady current settled through his palms and sank deep into the locked tendons. The sharp fire receded. The swelling knit. He pushed up from the frost, leaned lightly on his staff, and tested the weight. The leg held. Across the empty common, the yellow lanterns of the Wench glowed through the rising mist.</p>
+
+  <p>He tried the keep again in cold rain. Oswin Hale leaned over the stone merlon, his halberd across his arm, and shouted down: <span class="sc">“Keep is locked until first horn, scholar! Rufus’s orders — none pass the wicket after nightfall without an escort from the patrol. Take yourself back down to Gundigoot’s hearth till sunrise.”</span> <span class="j">“I’m here to see Dunstan!”</span> <span class="sc">“Keep your voice down, scholar! Dunstan’s turned in at the guardhouse loft hours ago, and Captain Rufus has the keys locked in the keep. No bar lifts till dawn — not for friend, trader, nor priest.”</span> He slipped on the wet ladder in the loft, barking his shin, and made himself a cozy bed with blankets, and slept until dawn.</p>
+
+  <p>At seven bells under the weeping willow, Dunstan was rolling his cloak and shaking the morning drizzle from his shield, boots turned toward the Wench and a hot breakfast. Jakal called across the dewy turf.</p>
+
+  <blockquote class="said jak">
+    <p>Hello, Dunstan. I may have found a new recruit for our group.</p>
+  </blockquote>
+
+  <p>Dunstan pulled up short on the frosty grass and turned back with keen interest, his weary face visibly heartened by the thought of another blade or stout back before the company returned to the road.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>That morning, walking back to the woodcutter’s, Jakal took stock of what he could actually cast. <span class="j">“I was sure I could cast two first-level spells. I have done so before.”</span> In the yard by the cordwood he asked Spugnoir what the strength and ward prayers were, and wondered whether he could cast the deeper wards. He asked what <em>find traps</em>, <em>snake charm</em>, <em>speak with animals</em> and <em>spiritual hammer</em> did, and for how long. <span class="sc">“The ward of sanctuary weaves a veil of hesitation around you, turning aside an enemy’s strike entirely, but shatters the instant you raise a hand to harm another.”</span> The hammer lasted only as long as unbroken focus, about three rounds in the thick of a melee, and vanished the moment you cast another prayer or swung steel with your own hands.</p>
+
+  <p>Then Jakal laid the silver mace on the wagon blankets and cast <em>Detect Magic</em>, and found a steady, moderate dweomer of martial enchantment and clerical consecration. He knelt, and prayed to Boccob to open his sight to malice. A faint pale glimmer washed across the dust motes of the haymow. The dry timber, the wool blankets and Spugnoir’s satchel stayed neutral and clear. But the fluted silver mace began to give off a sickly, violet-tinged aura.</p>
+
+  <p><span class="sc">“Does the silver bear a shadow?”</span> Spugnoir asked, in a low murmur.</p>
+
+  <blockquote class="said jak">
+    <p>Aye, it does. Not a curse, yet it has a taint of evil and cruelty.</p>
+  </blockquote>
+
+  <p>Spugnoir leaned forward across the straw without daring to touch it. <span class="sc">“That matches Lareth’s handiwork. If there is no binding compulsion or blood-curse upon the hilt, an able hand could still swing it in battle. Yet weapons forged in dark rites often chafe against sacred vows, or draw the eyes of the very things they served. Canon Terjon would likely demand it be broken on an anvil, whereas Master Burne might pay well for the silver and enchantments to melt down. If you keep it at your belt, Jakal, I would keep it bound in heavy linen when entering holy ground.”</span></p>
+
+  <blockquote class="said jak">
+    <p>Good advice. I’ll keep it wrapped in linen and out of sight. I will turn it against those who forged it.</p>
+  </blockquote>
+
+  <p>Later he asked the questions of a man who has begun to think about the world beyond the village. <span class="j">“And the north road leads to Verbobonc. The south road leads to — ? The west to the Kron Hills, and — ?”</span> Spugnoir told him of Nulb and the Lowrwater, the Kron Hills with their quarries and gnomish clans, and the far Lortmils. <span class="j">“Tell me about Celene.”</span></p>
+
+  <blockquote class="said">
+    <p>“The Faerie Kingdom beyond the Kron Hills. Ruled by the Fey Queen, Yolande. You won’t find a welcome there, Jakal. They helped break the Temple horde years back at Emridy Meadows, aye, but once the fighting was done, they drew their borders shut like an iron portcullis. To them, we are May-flies who live, burn, and rot before they finish tuning a lute.”</p>
+    <footer>Spugnoir of Dyvers</footer>
+  </blockquote>
+
+  <p>Jakal said, cheerfully, <span class="j">“Luckily I know how to make my hands spit fire now, thanks to you!”</span> Spugnoir was not to be flattered. <span class="sc">“Do not let the parchment go to your head, Jakal. You have the formula inked and stitched, aye, but a single jet from your palms will barely singe a beast three times your girth.”</span> Hill trolls, he added, took a great deal of killing, and if the flame sputtered before the hide was well charred, the creature would mend the blister while it snapped your ribs. <span class="sc">“Still, a candle is better than the dark.”</span> Spugnoir said that if they ever crossed the Kron ridge together, they would buy brimstone, pitch, and five gallons of lamp oil first. Jakal said he had seen the effectiveness of lamp oil at the moathouse. <span class="sc">“Impressive,”</span> said Spugnoir, <span class="sc">“until the greasy smoke fills your own lungs.”</span> Proper tin flasks, he insisted, not fragile glass.</p>
+
+  <div class="break">· · ·</div>
+
+  <p>Later that morning Jakal took Thran to the smithy. <span class="j">“We should head to the smithy to get you armor and a shield. Agreed?”</span> <span class="sc">“Thank you for this gift,”</span> Thran said. <span class="sc">“I will endeavor to use it well.”</span> The gift was the six-flanged iron mace from Brother Smyth’s forge, which Jakal had put into the ditcher’s hands when he greeted him.</p>
+
+  <p>Smyth did not give away mail for charity. A ring shirt alone would bleed twenty or thirty gold from their purses, and a stout shield half as much again. Jakal laid down the two carnelians from the moathouse. <span class="j">“How about two gems? Thran will help us protect Hommlet and your forge. What armor and shield will you arm him with?”</span> The smith grunted. <span class="sc">“Two stones at a hundred gold, then. I have a sound hauberk of iron ring mail sewn onto boiled hide from the militia stores, and a banded oak round shield hung by the rack. Take both, and I’ll call it eighty gold in trade — or I give you the mail, the shield, and twenty silver back in coin to square the two gems.”</span></p>
+
+  <p><span class="j">“Throw in a javelin or two, and that’s a fair trade, wouldn’t you say? I accept what the smith offers.”</span> <span class="sc">“Two javelins then,”</span> said Smyth, <span class="sc">“and fifteen silver to balance the steel.”</span> Thran hoisted the ring mail over his head; the rings clattered against the boiled hide, settling broad across his shoulders. He buckled the straps and tested the shield on his forearm and looked ready to march.</p>
+
+  <p><span class="j">“Excellent. Thank you, brother. You look ready for goblins or worse, Thran!”</span></p>
+
+  <p>They went to the green, under the weeping willow, to find Dunstan. Jakal stepped between the two men with an open hand, smoothing over a moment of fright. <span class="j">“Dunstan, this is Thran — a stout arm we met on the road. Where is Elmo?”</span> Dunstan relaxed his grip with an easy grin. <span class="sc">“Easy, friend. I’m Dunstan Mere. Can you swing that mace as well as you jump?”</span> Thran tried to steady his new kit, and his two ash javelins slipped against the stiff ring mail and clattered ignominiously into the dirt. Spugnoir snorted softly into his sleeve. <span class="sc">“The woodsman was still asleep in his cups by Gundigoot’s hearth at sunrise,”</span> he said dryly. North along the knoll path, Calmert was already striding down the steps, his chain mail pale in the late morning light.</p>
+</section>
+
+<!-- ============================ END ============================ -->
+<section class="part" id="end">
+  <h2><span class="num">Where Things Stand</span>The Willow, the Letter, and Everything Unfinished</h2>
+  <p class="when">The morning of world day 30 · played 22 October</p>
+
+  <p>The last thing in the record is a pause. Jakal stands beneath the willow on the green, and the narrator writes that he <em>blinks, shaking off the sudden haze of stillness that held you motionless beneath the willow boughs.</em> Spugnoir looks up from his gear in mild surprise. Elmo and Thran have not yet come back from the south track, where they have gone for Elmo’s things. Jakal leaves Spugnoir under the branches to keep watch, crosses the green toward the crossroads, and pushes through the heavy door of the trading post.</p>
+
+  <p>The latch clatters in the cool, crowded shop. Behind the counter, Rannos Davl and the stocky Gremag look up from their ledgers. Jakal asks whether any letter or message has arrived for Jakal Hierophant. Rannos’s thin mouth curls.</p>
+
+  <blockquote class="said">
+    <p>“We keep a trade house and freight depot, scholar, not an open post for penniless hedge-priests. No one has paid good coin to send you parchment.”</p>
+    <footer>Rannos Davl</footer>
+  </blockquote>
+
+  <p>Gremag grunts, his heavy gaze fixed on Jakal’s ash staff. Jakal turns his back on the counter and goes out into the bright morning air. The wind comes brisk and clean off the high pastures, carrying peat smoke and fresh mud. He crosses the rutted track and steps onto the open turf of the green, and beneath the sweeping boughs of the great weeping willow by the pond his companions are waiting, ready for what comes next.</p>
+
+  <p>It is not much of an ending, and it is not one. Jakal has been in Hommlet for thirty days by the world’s own count. He arrived with a staff, a dagger and a head full of what he had been taught, and in that time he has learned to put a company to sleep with a handful of sand, to carry a mace, to hand the call to the woodsman who should have it, and to sit with a widow on a porch step. He has been thrown into a ditch and put out of a church, lost a staff and, for a few minutes, the use of an ankle. He has sworn an oath to a friend to find magic that does not yet exist, and a druid has told him, and a canon through Calmert, that he cannot be both priest and mage. He has dedicated both of his callings to a god who does not mind. And he keeps checking the post.</p>
+
+  <h3 style="margin-top:2.4rem;font-size:1.05rem;letter-spacing:.06em;">What is still open</h3>
+  <ul class="threads">
+    <li><strong>The altar.</strong> It was quieted, not cleansed. Jaroo says hammers must break it and the fen be watched, and Canon Terjon promised hammers before nightfall. The record does not say whether they were ever swung.</li>
+    <li><strong>Davl and Gremag.</strong> Whistling Pete named them to Rufus, and Corporal Ersn and four men were sent to secure the trading post, yet on the morning of the twenty-second the traders are behind their counter, unmolested, selling the hedge-priest his answer.</li>
+    <li><strong>Turuko, Kobort and Zert.</strong> Still watching, still at their trestle, still, as far as Jakal can tell, spies for whatever lies under the moathouse.</li>
+    <li><strong>The silver mace.</strong> Wrapped in linen, tainted with the cruelty of its maker, kept on purpose. <em>Such steel has a way of remembering who commands it.</em></li>
+    <li><strong>The grimoire.</strong> Six dweomers, two of them loose between the gatherings, and the book wanting proper bookbinding paste.</li>
+    <li><strong>The oath.</strong> Twenty-two days old when Eldred called its first question madness. Neither Jakal nor Spugnoir has found a new spell yet.</li>
+    <li><strong>The Canon.</strong> He names Jakal an unsanctioned hedge-priest, and the price of peace is a spellbook he has not given up.</li>
+    <li><strong>Nulb.</strong> The night wagons are rolling south. Burne and Rufus are weighing whether to confront Davl’s shop directly or mount a campaign toward Nulb.</li>
+    <li><strong>The friends who have not come.</strong> A friend he was expecting. A cleric friend, <em>her,</em> not Calmert. <em>Valiant friends</em> on their way to Hommlet. A letter. The record does not say who they are.</li>
+  </ul>
+</section>
+
+<section class="part" id="cast">
+  <h2><span class="num">Appendix</span>Who Is Who</h2>
+  <p class="when">The people in this tale</p>
+  <dl class="cast">
+    <dt>Jakal Hierophant</dt><dd>A scholar of arcane casting and healing rites, new from the academy. Played by Marc.</dd>
+    <dt>Spugnoir of Dyvers</dt><dd>A journeyman arcanist; Jakal’s partner in the oath and the spellbooks.</dd>
+    <dt>Dunstan Mere</dt><dd>A sellsword with a banded oak shield and a bad habit of going first. Played by an LLM subagent.</dd>
+    <dt>Calmert of Cuthbert</dt><dd>A young cleric of St. Cuthbert, “the Cudgel.” Loyal to Jakal and bound by his Canon.</dd>
+    <dt>Elmo Thistlewood</dt><dd>A woodcutter who plays the sot, and the company’s tracker and archer.</dd>
+    <dt>Thran</dt><dd>A ditcher from the east trench, Jakal’s recruit. Played by Marc’s brother.</dd>
+    <dt>Canon Terjon</dt><dd>The Church of St. Cuthbert’s authority on the knoll.</dd>
+    <dt>Ostler Gundigoot</dt><dd>Keeper of the Welcome Wench.</dd>
+    <dt>Brother Smyth</dt><dd>The village smith, “a faithful son of the Cudgel.”</dd>
+    <dt>Master Burne, Captain Rufus, Oswin Hale</dt><dd>The mage of the stone tower, the keep’s captain, and the watchman at the gate. Corporal Ersn commands the men-at-arms.</dd>
+    <dt>Jaroo Ashstaff</dt><dd>A druid of the Old Faith with a grey badger.</dd>
+    <dt>Corl and Tad</dt><dd>The woodcutter and his boy, who give Jakal a loft.</dd>
+    <dt>Lareth</dt><dd>The fair-featured priest of the moathouse, taken alive.</dd>
+    <dt>Turuko the Baklunish, Kobort, Zert of the Wild Coast</dt><dd>The watchers at the window table.</dd>
+    <dt>Rannos Davl, Gremag, Rannulf</dt><dd>The traders at the crossroads post.</dd>
+    <dt>Eldred</dt><dd>An acolyte-scribe of the Temple of Boccob in Verbobonc.</dd>
+    <dt>Paul of Nulb</dt><dd>A teamster freed from the moathouse.</dd>
+    <dt>Old Gunder, Elgiva, Will and Eldred</dt><dd>A farmer killed on the south road, his widow, and the two sons (the second boy’s name is the acolyte’s; the record never explains the echo).</dd>
+    <dt>Miller Mytch, Jakk Bunt, the wheelwright</dt><dd>Villagers who give Jakal the news.</dd>
+    <dt>The Narrator</dt><dd>The voice that tells each turn. Played by the second model and the first model via APIs.</dd>
+    <dt>“Whistling Pete”</dt><dd>The cloaked traveller with the Dyvers dirk, who wanted no company; an assassin and eavesdropper, he named his masters and is in Rufus’s cells.</dd>
+  </dl>
+</section>
+
+<footer class="colophon">
+  <h2>How this was made</h2>
+  <p>The story was built from three things the world kept. First, Jakal’s own memories in the Greyhawk database: 804 of them, from the first evening to the morning of 22 October. Second, the narrator’s answers to Jakal, and the exact words Marc typed for him, which the prompt log keeps pulse by pulse. Third, what other people in the world said to Jakal, as the narrator told it to him. I did not use anyone else’s private memory, so nothing here comes from inside another character’s head.</p>
+  <p>Marc’s typed lines are printed with capitals and spelling mended and otherwise as he wrote them; where the narrator rendered an action as speech, that rendering is used. Other characters’ words in quotation marks are exactly the narrator’s. The prose between them is mine, and it follows the record: the order of events comes from the tick order, the dates from the witness logs (UTC), and where the record contradicts itself (who cast <em>Sleep</em> in the willow hollow; what the dart count was; whether the clay vial shattered; the dead farmer’s sons’ names; whether Dunstan walked up to the company on the green or nobody was there; whether Spugnoir or Jakal was carrying the holy water; whether Dunstan was in the Wench on the evening of the sixteenth; where Elmo was at the dawn muster) I took the version Jakal himself saw, or left the point out. A few garbled typed clauses are straightened, and the world’s clock, which turns on its players’ turns, runs differently from the log’s wall-clock dates, so where this telling says “that night” or “the next morning” it follows the narrator’s clock.</p>
+  <p>Where the record is silent, this telling is silent: why Jakal hid the old staff in the oak; why he went to Verbobonc; what the seven sisters are; who the friends he waits for may be; what became of the altar. Those are Marc’s to answer, or the world’s.</p>
+</footer>
+
+</main>
+</body>
+</html>

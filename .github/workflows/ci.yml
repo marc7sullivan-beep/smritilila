@@ -1,0 +1,76 @@
+# Copyright 2026 Marc Sullivan
+# SPDX-License-Identifier: Apache-2.0
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: smritilila
+          POSTGRES_PASSWORD: smritilila
+          POSTGRES_DB: smritilila_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U smritilila"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://smritilila:smritilila@localhost:5432/smritilila_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e ".[dev]"
+      - name: Tests
+        run: pytest -q
+      - name: The launcher on a fresh database
+        env:
+          DATABASE_URL: postgresql+asyncpg://smritilila:smritilila@localhost:5432/smritilila_ci
+          SMRITILILA_LOCAL_BASE_URL: http://127.0.0.1:9/v1
+          SMRITILILA_LOCAL_MODEL: ci-model
+        run: |
+          python scripts/serve.py check || true
+          python scripts/serve.py setup
+          python scripts/serve.py check
+
+  container:
+    runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image and start it with Postgres
+        run: |
+          cp .env.example .env
+          docker compose build
+          docker compose up -d
+      - name: It answers, with the example world planted
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8198/health >/dev/null 2>&1; then echo "up after $((i*5)) s"; break; fi
+            sleep 5
+          done
+          curl -fsS http://127.0.0.1:8198/health
+          curl -fsS http://127.0.0.1:8198/world/exists | tee /dev/stderr | grep -q '"exists":true'
+          curl -fsS http://127.0.0.1:8198/ | grep -q "Smritilila"
+          curl -fsS -o /dev/null http://127.0.0.1:8198/admin
+      - name: It keeps its state on the volume, not in the image
+        run: docker compose exec -T smritilila sh -c 'test -d /data/sakshi && ls /data'
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color smritilila | tail -60
+      - name: Down
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,2212 @@
+<!doctype html>
+<!-- Copyright 2026 Marc Sullivan. SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smritilila</title>
+<style>
+  :root {
+    --bg: #14151a;
+    --panel: #1c1e26;
+    --border: #2c2f3a;
+    --text: #e7e7ea;
+    --muted: #8b8d98;
+    --accent: #7c8cff;
+    --accent-dim: #4a4f7a;
+    --you: #d9c589;
+    --same: #f0d24a;    /* a player level with you (Marc, 2026-10-16): yellow */
+    --remote: #c9b6f2;  /* a player remote in place or time: light violet */
+    --error: #e07a7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  #app {
+    width: 100%;
+    max-width: 1140px;
+    padding: 24px 20px 40px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-weight: 500;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  textarea, input[type=text] {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+  }
+  textarea:focus, input[type=text]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  #new-world-view { max-width: 1100px; }
+  /* the builder (Marc, 2026-10-06): the conversation beside the brief it fills in; on a phone, stacked */
+  body.building #world-picker-row { display: none !important; }
+  #builder { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 860px) { #builder { grid-template-columns: minmax(0, 1fr); } }
+  #builder-log { display: flex; flex-direction: column; gap: 10px; min-height: 160px; max-height: 58vh; overflow-y: auto; padding: 2px; }
+  .bmsg { padding: 9px 13px; border-radius: 10px; line-height: 1.5; white-space: pre-wrap; max-width: 94%; font-size: 0.95rem; }
+  .bmsg.assistant { background: var(--bg); border: 1px solid var(--border); align-self: flex-start; }
+  .bmsg.user { background: var(--accent-dim); align-self: flex-end; }
+  .bmsg.thinking { color: var(--muted); font-style: italic; }
+  .bmsg.error { color: var(--error); border-color: var(--error); }
+  .builder-send-row { align-items: flex-end; margin-top: 12px; }
+  #builder-input { flex: 1 1 auto; min-width: 0; }
+  .nw-changed { animation: nwflash 1.8s ease-out; }
+  @keyframes nwflash { from { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-dim); } to { box-shadow: 0 0 0 0 transparent; } }
+  #builder-preview { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 0.92rem; line-height: 1.5; }
+  #builder-preview h4 { margin: 12px 0 4px; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  #builder-preview ul { margin: 0; padding-left: 18px; }
+  #builder-preview .nw-caution { color: var(--you); }
+  .nw-label { display: block; margin-top: 16px; font-size: 0.9rem; }
+  .nw-label:first-of-type { margin-top: 8px; }
+  .nw-label .req { color: var(--accent); font-size: 0.75rem; margin-left: 6px; }
+  .nw-hint { color: var(--muted); font-size: 0.8rem; margin: 2px 0 6px; }
+  #nw-breadth { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 0.9rem; }
+  /* on a phone the breadth choice takes a line of its own: sized by its longest option, it overflowed the page */
+  @media (max-width: 560px) { #nw-breadth { flex: 1 1 100%; min-width: 0; } }
+  /* maps (2026-10-23): the picked ones as chips, the saved ones as a grid of thumbnails to pick from */
+  #nw-maps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nw-map-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; font-size: 0.85rem; }
+  .nw-map-chip button { all: unset; cursor: pointer; color: var(--muted); }
+  #nw-map-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+  #nw-map-picker .map-card { border: 1px solid var(--border); border-radius: 6px; padding: 4px; cursor: pointer; background: var(--bg); font-size: 0.8rem; overflow-wrap: anywhere; }
+  #nw-map-picker .map-card.on { outline: 2px solid var(--accent); }
+  #nw-map-picker .map-card img { width: 100%; height: 90px; object-fit: contain; display: block; }
+  button {
+    background: var(--accent-dim);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; border-color: var(--border); color: var(--muted); }
+  button.secondary:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: center; }
+  .row > * { flex: 1; }
+  .row > button, .row > a, .row > span { flex: 0 0 auto; }
+  /* the day and time at the end of the play bar is a long line: it may shrink and wrap, so a narrow screen does not scroll sideways */
+  #current-time-label { flex: 0 1 auto; min-width: 0; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .divider { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 18px 0; }
+
+  /* Side by side once there's room for it; stacked (player narration
+     first) below that, so this never forces the page to scroll
+     horizontally -- a real risk here since the Browser pane itself can
+     be much narrower than a typical desktop window. */
+  #columns { display: flex; gap: 20px; align-items: flex-start; }
+  #player-column { flex: 1.3; min-width: 0; display: flex; flex-direction: column; }
+  #entity-column { flex: 1; min-width: 0; }
+  #entity-column.collapsed { display: none; }  /* opened and closed from the top row (Marc, 2026-09-27) */
+  #online-list .on { color: var(--you); }
+  #online-list .same { color: var(--same); }                        /* level with you: the same scene and minute (Marc, 2026-10-16) */
+  #online-list .remote { color: var(--remote); cursor: pointer; }   /* remote in place or time: choose to sync */
+  #online-list .remote:hover, #online-list .remote:focus { text-decoration: underline; }
+  @media (max-width: 720px) {
+    #columns { flex-direction: column; }
+    #player-column, #entity-column { width: 100%; }
+    #act-form { position: static; }
+  }
+  .col-heading { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
+
+  #player-log { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+  .entry { padding: 12px 14px; border-radius: 6px; border-left: 3px solid var(--border); background: var(--panel); }
+  .entry .who { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+  .entry.you { border-left-color: var(--you); }
+  .entry.you .who { color: var(--you); }
+  .entry.system { border-left-color: var(--accent); font-style: italic; color: var(--muted); }
+  .entry.confirm { border-left-color: var(--accent); }
+  .entry.confirm .yn { margin-top: 8px; display: flex; gap: 8px; }
+  .entry.witnessed { border-left-style: dotted; font-style: italic; }
+  .entry.error { border-left-color: var(--error); color: var(--error); }
+  .entry .sara-said { margin-top: 8px; font-weight: 600; }
+  .entry .sara-turn { margin-top: 6px; font-style: italic; color: var(--muted); }
+  .entry details { margin-top: 6px; }
+  .entry details summary { cursor: pointer; font-size: 0.8rem; color: var(--muted); list-style: none; }
+  .entry details summary::before { content: "\25B8 "; }
+  .entry details[open] summary::before { content: "\25BE "; }
+  .entry details > div { margin-top: 6px; }  /* the whole narration at full brightness; only the toggle is muted (Marc, readability) */
+  /* the whole narration only -- no pith, no fold (the short-narration setting is gone) */
+  .has-fold.whole > .sara-pith, .has-fold.whole > .sara-said,
+  .has-fold.whole > .sara-turn, .has-fold.whole summary { display: none; }
+  .has-fold.whole details { margin-top: 0; }
+  .has-fold.whole details > div { margin-top: 0; }
+  #player-controls { margin: 0 0 8px; column-gap: 36px; }
+  .control-group { display: inline-flex; align-items: center; gap: 8px; }
+  .toggle-switch { min-width: 76px; padding: 5px 12px; font-size: 0.85rem; }
+  .toggle-switch[aria-pressed="false"] { background: transparent; border-color: var(--border); color: var(--muted); }
+  .turn { display: flex; flex-direction: column; gap: 14px; }
+  .turn[hidden] { display: none; }
+  /* Single collapse-toggle button style, shared by the turn log's own
+     "N earlier turns" button and an entity card's "N earlier memories"
+     button -- previously turn-summary was one per collapsed turn, shown
+     only as a child of that turn (.turn.collapsed .turn-summary); now
+     it's a standalone element wherever it appears, so display is
+     unconditional rather than gated on a parent's own collapsed class. */
+  .turn-summary { display: block; width: 100%; text-align: left; padding: 6px 14px; background: none; border: none; border-left: 3px solid var(--border); color: var(--muted); font-size: 0.85rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .turn-summary .arrow { display: inline-block; margin-right: 4px; }
+
+  #act-form { display: flex; gap: 10px; position: sticky; bottom: 20px; }
+  /* saṅgama: who is in the round with you, and who has acted -- never what */
+  #round-status { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
+  #round-status .acted { color: var(--you); }
+  #go-btn { margin-left: auto; white-space: nowrap; min-width: 6.2em; }  /* Go at the far right (Marc); a fixed width, so the countdown never resizes the row */
+  #act-btn { min-width: 4.2em; }
+  /* a phone: the whole width for the words, the buttons on their own line beneath (Act left, Go right) */
+  @media (max-width: 640px) {
+    form#act-form { flex-wrap: wrap; }
+    form#act-form textarea#act-input { flex: 1 1 100%; }
+  }
+  /* the whole action in view, however long (Marc): the box grows with it */
+  #act-input { flex: 1; resize: none; overflow: hidden; min-height: 0; line-height: 1.4; }
+  #act-form { align-items: flex-end; }
+  .suggested-action-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    font-style: italic;
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .suggested-action-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); background: transparent; }
+  .suggested-action-btn .arrow { margin-right: 6px; }
+  .suggested-action-btn[hidden] { display: none; }  /* display:block above beat the attribute: empty boxes with no suggestion */
+
+  .entity-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .entity-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: left;
+  }
+  .entity-toggle:hover { background: var(--accent-dim); }
+  .entity-toggle .arrow { color: var(--muted); flex: 0 0 auto; transition: transform 0.15s; }
+  .entity-toggle[aria-expanded="true"] .arrow { transform: rotate(90deg); }
+  .entity-card-body { padding: 0 14px 12px; }
+  .entity-card .memory { font-size: 0.88rem; padding: 8px 0; border-top: 1px solid var(--border); }
+  .entity-card .memory:first-child { border-top: none; padding-top: 0; }
+
+  /* the world-state table shows raw ids: for the developer, not players -- open the page with ?debug */
+  .debug-only { display: none !important; }
+  body.debug a.debug-only { display: inline !important; }
+  #state-panel { display: none; }
+  #state-panel.open { display: block; }
+  #state-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  #state-panel th, #state-panel td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  #state-panel th { color: var(--muted); font-weight: 500; }
+  #new-world-corner { position: absolute; top: 12px; left: 12px; z-index: 10; }
+  @media (max-width: 1300px) { #app { padding-top: 60px; } }
+  #new-character-view { max-width: 780px; }
+  #nc-locations { margin-top: 10px; }
+  #nc-locations label { display: block; padding: 6px 0; cursor: pointer; }
+  #nc-locations input { width: auto; margin-right: 8px; }
+
+  .hidden { display: none !important; }
+  /* retiring (Marc, 2026-10-01): not reversible, so it is asked for by name */
+  #retire-btn { border-color: var(--border); color: var(--muted); background: transparent; }
+  #retire-btn:hover:not(:disabled) { border-color: var(--error); color: var(--error); background: transparent; }
+  #retire-panel { border: 1px solid var(--error); border-radius: 6px; padding: 12px; margin-bottom: 12px; background: var(--panel); }
+  #retire-panel p { margin: 0 0 8px 0; }
+  #retire-input { width: 100%; max-width: 360px; margin: 6px 0 10px 0; }
+  #retire-confirm-btn { background: transparent; border-color: var(--error); color: var(--error); }
+  #retire-confirm-btn:hover:not(:disabled) { background: var(--error); color: var(--bg); }
+  #retire-confirm-btn:disabled { opacity: 0.4; }
+  a.toggle { color: var(--accent); text-decoration: none; font-size: 0.85rem; cursor: pointer; }
+
+  #intro-panel { max-width: 780px; margin-bottom: 16px; line-height: 1.55; }
+  #intro-panel h2 { font-size: 1rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+  #intro-panel p { margin: 0 0 10px; font-size: 0.92rem; }
+  #intro-world { font-style: italic; color: var(--muted); }
+  #intro-link { margin-left: 12px; }
+  #intro-panel .same { color: var(--same); }       /* the examples in the paragraph wear the colours the list wears */
+  #intro-panel .remote { color: var(--remote); }
+  #admin-link { position: absolute; top: 12px; left: 110px; z-index: 10; }
+  #continue-view { display: none; max-width: 780px; }
+  #continue-view.open { display: block; }
+  #continue-characters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  #continue-characters button { flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<button id="new-world-corner" class="secondary" title="Everything that makes a world">new world</button>
+<button id="admin-link" class="secondary hidden" title="Worlds and who may enter them (owner only)">admin</button>
+<div id="app">
+  <h1>Smritilila</h1>
+
+  <div id="world-picker-row" class="row hidden" style="margin-bottom: 16px;">
+    <span class="muted" id="world-select-label">world</span>
+    <select id="world-select" style="flex:0 0 auto; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px;"></select>
+    <span class="muted hidden" id="world-description" style="flex:1 1 16em; min-width:0; font-style:italic;"></span>
+    <button id="new-character-btn" class="hidden" style="flex:0 0 auto;">new character</button>
+    <a class="toggle" id="intro-link" href="#" title="How this works">how to play</a>
+  </div>
+
+  <div id="intro-panel" class="panel hidden">
+    <h2>Welcome</h2>
+    <p id="intro-world"></p>
+    <p>This is a shared, living world. You are one person or creature in it, and the world goes on around you whether or not you are watching.</p>
+    <p><b>Choose a character</b> and describe who you are in your own words: what you do, what brings you, who you know, what matters to you. Everything you state about yourself is remembered forever and shapes your world.</p>
+    <p>Then write what your character does or says, as you would tell it. A narrator answers with what happens. You may attempt to do anything your character could do here. You cannot decide what others do, only what you do.</p>
+    <p><b>Act</b> sends what you wrote. Alone, that is all: the narrator answers with what happens in the world. Other players may be here at the same time. When several are, the world moves in rounds: everyone writes their action and presses Act, and the story goes on when all have. You can see who is in the round and who has acted, never what they wrote. Your action stays in the box; if you type again it is taken back until you press Act again.</p>
+    <p><b>Go</b> appears when others are in the round. It closes the round without waiting for everyone: once those who have not acted have stopped typing. Anyone who had not acted does their first suggested action. You can press Go only after you have acted.</p>
+    <p><b>Who else is here.</b> When another player or llm controlled bot is online, a line above the box lists them: <span style="white-space:nowrap">players online: you · <span class="same">Mira</span> · <span class="remote">Tomas</span></span>. A name in <span class="same">yellow</span>, like Mira, is level with you, in your place at your minute, so you act together. A name in <span class="remote">light violet</span>, like Tomas, is elsewhere, in place or in time; hover over it to see where and when. Click a violet name and the page asks, for example, "Join Tomas: advance to 3:40 pm and go to the ferry landing?". Answer Yes and your time advances and you move.</p>
+    <p><b>Offline</b> defaults to frozen, when frozen the world cannot affect you. Change it to waiting and your character will respond to the world based on your character's memories.</p>
+    <p><b>Time.</b> Each character carries their own present, and an action takes as long as it would, so characters who are apart run at their own pace -- one can ride a day while another waits an hour. If an action would carry you more than half an hour ahead (each world sets its own limit), the page asks first: "You are about to jump ahead ... Proceed? Y / N". N does nothing, and neither does typing a new action instead.</p>
+    <p><b>Luck.</b> Each turn a random luck is drawn which affects the outcome of whatever you attempt. It can change the outcome of your actions from providential to ruinous though most of the time it will be in the middle. Ruinous when talking with a good friend might result in mild irritation, ruinous while scaling a cliff is a different matter entirely.</p>
+    <p><b>The retire button</b> permanently releases your character to live in the world and they will act on their own.</p>
+    <button id="intro-ok">Got it</button>
+  </div>
+
+  <div id="continue-view" class="panel">
+    <p class="muted" id="continue-intro">Continue as one of these characters:</p>
+    <div id="continue-characters"></div>
+  </div>
+
+  <div id="new-character-view" class="panel hidden">
+    <p class="muted">Arrive as someone new -- a stranger to everyone here. Say who you are, and choose where you arrive.</p>
+    <textarea id="nc-self" rows="3" placeholder="I am ... -- name, what you do, what brings you here. Every fact you state is kept."></textarea>
+    <div id="nc-locations"><p class="muted">loading...</p></div>
+    <div class="row" style="margin-top:8px;">
+      <button id="nc-arrive-btn">Arrive</button>
+      <button id="nc-cancel-btn" class="secondary">cancel</button>
+    </div>
+  </div>
+
+  <div id="new-world-view" class="panel hidden">
+    <div id="builder">
+      <div id="builder-chat">
+        <div id="builder-log" aria-live="polite"></div>
+        <div class="row builder-send-row">
+          <textarea id="builder-input" rows="3" placeholder="Describe the world you want to make..."></textarea>
+          <button id="builder-send">send</button>
+        </div>
+      </div>
+      <div id="builder-brief">
+        <label class="nw-label" for="nw-name">World name <span class="req">required</span></label>
+        <input type="text" id="nw-name" placeholder="e.g. Treasure Island, 1765" />
+        <label class="nw-label" for="nw-source">Source <span class="req">required</span></label>
+        <p class="nw-hint">History, a book, a film, the present day or an invention -- and which. The first thing the Narrator reads, every turn.</p>
+        <input type="text" id="nw-source" placeholder="e.g. Book: Treasure Island, R. L. Stevenson -- or History: the Arizona Territory, 1881" />
+        <label class="nw-label" for="nw-where-when">Where and when <span class="req">required</span></label>
+        <textarea id="nw-where-when" rows="2" placeholder="e.g. Bristol and the Spanish Main, 1765"></textarea>
+        <label class="nw-label" for="nw-begins">Where it begins</label>
+        <textarea id="nw-begins" rows="2"></textarea>
+        <label class="nw-label" for="nw-different">What is different here</label>
+        <p class="nw-hint">From the source or from ordinary life: an alternative history, magic, a technology that does not exist, what the dead are. Leave it blank for a faithful world.</p>
+        <textarea id="nw-different" rows="2"></textarea>
+        <label class="nw-label" for="nw-feel">What play should feel like</label>
+        <p class="nw-hint">Its tone, its danger and pace, and how hard it is: forgiving, fair or deadly.</p>
+        <textarea id="nw-feel" rows="2"></textarea>
+        <label class="nw-label" for="nw-map-btn">Maps</label>
+        <p class="nw-hint">Pick a saved map image, or browse for one on this computer (it is saved on the server). The builder looks at a map with the next message you send, and when the world is built each map is read place by place into a proposal for you to review. <strong>Maps need a model that can read images.</strong></p>
+        <div class="row" style="gap:10px; align-items:center;">
+          <button id="nw-map-btn" type="button" class="secondary">Attach a saved map</button>
+          <button id="nw-map-browse" type="button" class="secondary" title="Choose an image file on this computer">Browse for an image...</button>
+          <input type="file" id="nw-map-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif">
+          <span id="nw-maps"></span>
+        </div>
+        <div id="nw-map-picker" class="hidden"></div>
+        <div class="row" style="gap:12px; align-items:center; margin-top:14px;">
+          <label class="muted" for="nw-breadth">how much to build</label>
+          <select id="nw-breadth" title="How much of the world to build now. Small and larger first write an account of the wider world, then build the region where it begins; medium and large then grow it outward, ring by ring, which takes longer and many more model calls. The rest grows by play.">
+            <option value="here">here -- only where it begins</option>
+            <option value="around">around -- a day's walk of places and people</option>
+            <option value="small" selected>small -- the region, its nearest seats and named people (about 25 places)</option>
+            <option value="medium">medium -- small, and three rings outward (about 70 places)</option>
+            <option value="large">large -- small, and seven rings outward (about 120 places: the size of Stonemarch's map buildout)</option>
+          </select>
+        </div>
+        <div class="row" style="gap:12px; margin-top:14px;">
+          <button id="nw-preview-btn" class="secondary" title="What the world will open with, before anything is built">Preview</button>
+          <button id="nw-create-btn">Build the world</button>
+        </div>
+        <p class="muted" id="nw-status" style="margin-top:8px;"></p>
+        <div id="builder-preview" class="hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="play-view" class="hidden">
+    <div class="row" id="player-controls">
+      <span class="control-group"><span class="muted">offline</span>
+      <button id="offline-toggle" class="toggle-switch" aria-pressed="false" title="What happens to this character when you log off. Frozen: out of the world until you come back -- nobody sees them, nothing happens to them, and their return is narrated. Waiting: they stay where they are, seen by anyone who comes, and take no turn of their own until someone interacts with them.">frozen</button></span>
+      <span class="control-group"><button id="logoff-btn" class="secondary">log off</button></span>
+      <span class="control-group"><button id="retire-btn" title="Give this character up for good: they stay in the world, and you never play them again">retire&hellip;</button></span>
+      <span class="control-group muted hidden" id="online-list" title="The players online. Yellow: level with you. Light violet: remote in place or time; choose one to sync with them (one in your past cannot be synced with)."></span>
+      <span class="control-group"><button id="here-toggle" class="secondary" aria-expanded="false" aria-controls="entity-column"
+        title="Who and what is here with you, and what they remember">here with you &#9656;</button></span>
+    </div>
+    <div id="retire-panel" class="hidden" role="dialog" aria-labelledby="retire-title">
+      <p id="retire-title"><strong>Retire <span id="retire-name"></span>? This cannot be undone.</strong></p>
+      <p class="muted">You will never play them again. They stay in the world as anyone does -- where they are, as they are --
+        and the world acts for them only when it draws them. Living or dead, what becomes of them is the world's.</p>
+      <label class="muted" for="retire-input">Type <strong id="retire-name-typed"></strong> to confirm</label><br>
+      <input type="text" id="retire-input" autocomplete="off" spellcheck="false">
+      <div><button id="retire-confirm-btn" disabled>retire them</button>
+        <button id="retire-cancel-btn" class="secondary">cancel</button></div>
+      <p class="muted" id="retire-status"></p>
+    </div>
+    <div class="row" style="margin-bottom: 12px;">
+      <span class="muted">playing as</span>
+      <select id="character-select" style="flex:0 0 auto; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px;"></select>
+      <span class="muted">at</span>
+      <span id="current-location-label"></span>
+      <span class="muted" id="current-time-label"></span>
+      <a class="toggle debug-only" id="state-toggle">world state &#9662;</a>
+    </div>
+
+    <div id="state-panel" class="panel">
+      <table id="entities-table"><thead><tr><th>entity</th><th>labels</th></tr></thead><tbody></tbody></table>
+      <div class="divider"></div>
+    </div>
+
+
+    <div id="columns">
+      <div id="player-column">
+        <p class="col-heading">You</p>
+        <div id="player-log"></div>
+        <button type="button" id="suggested-action-btn" class="suggested-action-btn" hidden></button>
+        <button type="button" id="suggested-action-memory-btn" class="suggested-action-btn" hidden></button>
+        <div id="round-status" class="hidden"></div>
+        <form id="act-form">
+          <textarea id="act-input" rows="1" placeholder="do anything -- e.g. steps into the lane" autocomplete="off"></textarea>
+          <button type="submit" id="act-btn">Act</button>
+          <button type="button" id="go-btn" class="hidden" title="close the round">Go</button>
+        </form>
+      </div>
+      <div id="entity-column" class="collapsed">
+        <p class="col-heading">Here with you</p>
+        <div id="entity-cards"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "";
+// Text a model or a world wrote -- labels, suggestions -- goes into the page
+// as text, never as markup: a "<" or "&" in a name must not break the page.
+function esc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+if (new URLSearchParams(location.search).has("debug")) document.body.classList.add("debug");
+let world = null;
+// Which entity POST /pulses acts as -- purely client-side choice among
+// world.playable_entity_ids; the server has no notion of a "currently
+// active" character, only a per-request entity_id (routes/bija.py's own
+// docstring). Reset to world.scene_owner_entity_id whenever it's unset
+// or no longer valid (a fresh world, a reload) -- see
+// renderCharacterSwitcher, which does the resetting. It is set to a chosen
+// character by the switcher's own change handler, the Arrive handler and the continue buttons.
+let actingAs = null;
+// Every narration ever routed to a non-active entity, keyed by entity id
+// -- kept independent of the DOM (#entity-cards' innerHTML is rebuilt on every
+// renderEntityPanel() call, since which entities even show up there
+// changes as the active character moves) so switching locations and
+// coming back doesn't lose anything already witnessed.
+let entityMemories = new Map();
+// Which entity ids are currently expanded in the side panel. Survives
+// renderEntityPanel() re-renders (it reads this, never resets it) --
+// only the panel's own toggle click and a fresh page load (a world
+// switch reloads the page) change it.
+let expandedEntities = new Set();
+// Which entities currently have their OLDER memories (everything besides
+// the single most recent one) revealed -- same survives-a-re-render,
+// reset-only-on-a-fresh-world pattern as expandedEntities above, one level
+// deeper: expandedEntities decides whether a card is open at all, this
+// decides whether an open card's own backlog is showing.
+let expandedEntityMemories = new Set();
+// Each act-form submission's action+narration entries are grouped into one
+// "turn" div (see startTurn/endTurn); only the most recent turn that has
+// been told, and any after it, stay open; everything before them collapses
+// behind one shared toggle button (olderTurnsExpanded) -- previously each
+// older turn got its OWN one-line summary button, which meant a long session
+// accumulated one button per past turn rather than one button for "the past"
+// as a whole.
+const turnElements = [];
+let olderTurnsExpanded = false;
+// The single toggle button's own DOM node, lazily created and kept as the
+// first child of #player-log -- reset to null wherever the log itself is
+// cleared (a page load, or a character switch: clearPlayerLog) so a fresh one is created then.
+let olderTurnsToggleEl = null;
+let currentTurn = null;
+let turnSeq = 0;
+// The Narrator's own one-sentence proposal for actingAs's next move
+// (PulseResponse.suggested_next_action) -- belongs to whichever
+// character/scene produced it, so it's cleared on a character switch or
+// a fresh world, same as entityMemories/expandedEntities above.
+let suggestedNextAction = "";
+// A second suggestion, deliberately grounded in actingAs's own memory
+// rather than the immediate scene (PulseResponse.suggested_next_action_
+// from_memory) -- same lifecycle/clearing as suggestedNextAction above.
+let suggestedNextActionFromMemory = "";
+// A character's own recent tuples from the store (GET /entities/{id}/
+// memories) -- the truthful content of an "everyone else" card in v3, where
+// the in-session narration list above is empty for anyone who has not had an
+// autonomous turn since the page loaded (Ravenmoor, 2026-09-19: Hartley, six
+// memories, blank card).
+//
+// Asked again after every pulse and whenever the scene has news (Marc,
+// 2026-10-20: Filonius's cat got a memory from each of his pulses and its
+// card kept the first one it had loaded). The card never goes blank while it
+// asks: `tupleEpoch` counts the looks the store is owed, `entityTupleEpoch`
+// says at which one each card last asked, and the cached list stays on the
+// card until an answer that differs replaces it -- in that card alone.
+let entityTuples = new Map();       // id -> [text] | null (first look in flight)
+let entityTupleEpoch = new Map();   // id -> the tupleEpoch it last asked at (-1: ask again at the next draw)
+let entityTupleAsk = new Map();     // id -> the newest ask, so a slow older answer is let go
+let tupleEpoch = 0;
+
+function sameTuples(a, b) {
+  return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((t, i) => t === b[i]);
+}
+
+// What a card says: the store's account once it has one, what this page was told until then.
+function entityCardMemories(id) {
+  const stored = entityTuples.get(id);
+  return stored && stored.length ? stored : (entityMemories.get(id) || []);
+}
+
+// The store has moved on (a pulse was committed, or the scene has news): every card shown open asks it again, quietly.
+function refreshEntityTuples() {
+  tupleEpoch++;
+  let ids = [];
+  try { ids = coLocatedEntityIds(); } catch (e) { ids = []; }
+  for (const id of ids) if (expandedEntities.has(id)) loadEntityTuples(id);
+}
+
+async function loadEntityTuples(id) {
+  if (entityTupleEpoch.get(id) === tupleEpoch) return;   // already asked at this look
+  entityTupleEpoch.set(id, tupleEpoch);
+  const ask = (entityTupleAsk.get(id) || 0) + 1;
+  entityTupleAsk.set(id, ask);
+  if (!entityTuples.has(id)) entityTuples.set(id, null);   // only the first look leaves the card saying it is remembering
+  let fresh = null;
+  try {
+    const r = await api(`/entities/${encodeURIComponent(id)}/memories?limit=8`);
+    fresh = r.memories.map(m => m.experience);
+  } catch (e) {
+    fresh = null;
+  }
+  if (entityTupleAsk.get(id) !== ask) return;   // a newer look has been asked since
+  const had = entityTuples.get(id);
+  if (fresh === null) {
+    entityTupleEpoch.set(id, -1);               // the next draw tries again
+    if (had !== null) return;                   // what the card shows stays
+    fresh = [];                                 // the first look failed: nothing remembered yet
+  }
+  if (sameTuples(had, fresh)) return;           // nothing new: nothing is drawn
+  entityTuples.set(id, fresh);
+  refreshEntityCard(id);
+}
+
+async function api(path, method, body) {
+  const opts = { method: method || "GET" };
+  if (body !== undefined) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const resp = await fetch(API + path, opts);
+  const text = await resp.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON body */ }
+  if (!resp.ok) {
+    const detail = (data && data.detail) ? data.detail : (text || resp.statusText);
+    throw new Error(`${resp.status}: ${JSON.stringify(detail)}`);
+  }
+  return data;
+}
+
+// A send that fails in transit -- the phone's connection dropped ("Load failed"), the server restarting
+// behind the tunnel (502/503/530), "Failed to fetch" -- is tried again for a while, the button saying so
+// (Marc, 2026-09-27). An action carries the page's own id, so the server runs it once however often it
+// arrives: a retry of one it already has joins it. Tried for 90 s, not 25 (Marc, 2026-10-06: an iPhone on mobile data
+// lost the connection for longer than that, three times, and the long pulses themselves take 25-37 s).
+const SEND_RETRY_MS = 90000;
+function newClientId() {
+  try { return crypto.randomUUID(); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+}
+// An action whose send failed may still have run: the answer was lost, not the action. Pressing Act again with the same text
+// reuses its id, so the server hands back the first telling and does not run it a second time (Marc, 2026-10-06: one action ran
+// three times after "Load failed"). A send the server answered clears it, so a fresh press is a fresh action.
+let failedSend = null;
+function sendIdFor(text, entity) {
+  return failedSend && failedSend.text === text && failedSend.entity === entity ? failedSend.id : newClientId();
+}
+async function sendWithRetry(path, method, body) {
+  const btn = document.getElementById("act-btn");
+  const deadline = Date.now() + SEND_RETRY_MS;
+  for (;;) {
+    try { return await api(path, method, body); }
+    catch (e) {
+      const transient = e instanceof TypeError || /^(502|503|504|520|521|522|523|524|530):/.test(e.message || "");
+      if (!transient || Date.now() > deadline) throw e;
+      btn.textContent = "reconnecting…";
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+}
+
+function entityById(entityId) {
+  return world ? world.entities.find(e => e.id === entityId) : undefined;
+}
+
+function labelFor(entityId) {
+  if (!world) return entityId;
+  const e = world.entities.find(e => e.id === entityId);
+  return (e && e.labels && e.labels[0]) ? e.labels[0] : entityId;
+}
+
+// -- Left column: the player's own narration + input --------------------
+
+function appendPlayerEntry(who, text, cls, sara, detail, entityId) {
+  // sara (v3): the narration's pith -- what happened, the
+  // one line said (verbatim), what is waiting -- is built beside the full
+  // narration, which sits beneath it in a native <details>; since 2026-10-19
+  // the pith is hidden (.whole, below), so the whole narration is what shows. Without a sara the text
+  // shows whole, as before.
+  const log = document.getElementById("player-log");
+  const div = document.createElement("div");
+  div.className = "entry" + (cls ? " " + cls : "");
+  const whoDiv = document.createElement("div");
+  whoDiv.className = "who";
+  whoDiv.textContent = who;
+  const textDiv = document.createElement("div");
+  textDiv.textContent = sara || text;
+  if (sara) textDiv.className = "sara-pith";
+  div.appendChild(whoDiv);
+  div.appendChild(textDiv);
+  if (sara && detail) {
+    if (detail.said) {
+      const q = document.createElement("div");
+      q.className = "sara-said";
+      q.textContent = "\u201c" + detail.said + "\u201d";
+      div.appendChild(q);
+    }
+    if (detail.turn) {
+      const t = document.createElement("div");
+      t.className = "sara-turn";
+      t.textContent = detail.turn;
+      div.appendChild(t);
+    }
+  }
+  if (sara && text && text !== sara) {
+    const fold = document.createElement("details");
+    // The whole narration is what shows: no pith, no fold (Marc, 2026-10-19: the
+    // short-narration setting is gone; it was off by default). The CSS hides the
+    // pith, the said line and the summary of an entry marked .whole.
+    div.classList.add("has-fold", "whole");
+    fold.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = "the whole of it";
+    const full = document.createElement("div");
+    full.textContent = text;
+    fold.appendChild(summary);
+    fold.appendChild(full);
+    div.appendChild(fold);
+  }
+  (currentTurn || log).appendChild(div);
+  // to the foot of the log and the action box, not of the page: on a phone "here with you" stacks below
+  // them, and the page's own foot is that panel (Marc, 2026-09-27: "let's not do that")
+  const foot = document.getElementById("player-column").getBoundingClientRect().bottom + window.scrollY;
+  window.scrollTo(0, Math.max(0, foot - window.innerHeight));
+}
+
+// -- Turn grouping: one act-form round (the "attempts" line plus its
+// resulting narration/system entries) collapses as a unit once it is older
+// than the most recent told turn (see applyTurnCollapse) -- every older turn
+// hides behind one shared "N earlier turns" toggle button, not one summary
+// line each.
+
+function startTurn() {
+  const log = document.getElementById("player-log");
+  // an answered jump question is done with once the next action starts (Marc, 2026-09-25)
+  log.querySelectorAll(".entry.confirm").forEach(el => el.remove());
+  const turn = document.createElement("div");
+  turn.className = "turn";
+  turn.dataset.turnId = String(++turnSeq);
+  log.appendChild(turn);
+  turnElements.push(turn);
+  currentTurn = turn;
+}
+
+function endTurn() {
+  currentTurn = null;
+  applyTurnCollapse();
+}
+
+function ensureOlderTurnsToggle() {
+  const log = document.getElementById("player-log");
+  if (!olderTurnsToggleEl) {
+    olderTurnsToggleEl = document.createElement("button");
+    olderTurnsToggleEl.type = "button";
+    olderTurnsToggleEl.className = "turn-summary";
+    olderTurnsToggleEl.addEventListener("click", () => {
+      olderTurnsExpanded = !olderTurnsExpanded;
+      applyTurnCollapse();
+    });
+  }
+  if (log.firstChild !== olderTurnsToggleEl) log.insertBefore(olderTurnsToggleEl, log.firstChild);
+  return olderTurnsToggleEl;
+}
+
+function applyTurnCollapse() {
+  // The turns shown are the most recent one that has been TOLD (its narration is in) and everything after
+  // it (Marc, 2026-09-27: the phone jumped -- folding the last narration away the moment an action was sent
+  // shortened the page before anything replaced it, and in a round that gap lasts the whole wait)
+  let keepFrom = turnElements.length - 1;
+  for (let i = turnElements.length - 1; i >= 0; i--) {
+    if (turnElements[i].querySelector(".entry.you")) { keepFrom = i; break; }
+  }
+  const olderCount = keepFrom; // everything before it
+  if (olderCount <= 0) {
+    if (olderTurnsToggleEl) olderTurnsToggleEl.hidden = true;
+    turnElements.forEach(turn => { turn.hidden = false; });
+    return;
+  }
+  const toggle = ensureOlderTurnsToggle();
+  toggle.hidden = false;
+  toggle.innerHTML = olderTurnsExpanded
+    ? `<span class="arrow" style="transform:rotate(90deg);">&#9656;</span>hide earlier turns`
+    : `<span class="arrow">&#9656;</span>${olderCount} earlier ${olderCount === 1 ? "turn" : "turns"}`;
+  turnElements.forEach((turn, i) => {
+    turn.hidden = i < keepFrom && !olderTurnsExpanded;
+  });
+}
+
+// -- Right column: entities co-located with actingAs, each a collapsible
+// button revealing its memories (the store's, via entityCardMemories) -----
+
+// v2's graph layer lived here and is gone (2026-09-22): locationOf,
+// locationChain, kshetraOf, adjacentLocations, heldEntityIds, and a
+// local re-derivation of who is present. All six read `world.relations`
+// -- `loc`, `within`, `adjacent_to`, `holds` -- which GET /world has not
+// carried since v2 went on 2026-09-21, so they did not degrade, they
+// threw. kshetraOf was the last reader of EntityOut.origin's shape, and
+// the "any shared ancestor" reading it mirrored has no meaning in a
+// world where space is reconstructed from place streams (v5 §1).
+//
+// The server answers all of it now, from the tuples: GET
+// /entities/{id}/scene, which is smrti/kosha.py's scene_of. One answer,
+// the engine's, and no copy of a rule kept here to drift from it.
+
+// The server's answer to "where is this entity and who is with them",
+// cached for the entity it was last fetched for. GET
+// /entities/{id}/scene -- smrti/kosha.py's scene_of, over the tuples.
+// `forEntity` is null until the first answer arrives, and every reader
+// below checks it: before there is an answer there is no answer, and
+// the honest display of that is an empty panel.
+let sceneCache = { forEntity: null, present: [], adjacent: [], location: null };
+
+// Where an entity is, in v3: the place of its last tuple, which is what
+// /entities/{id}/scene answers (smrti/kosha.py's scene_of). A null answer
+// is NOWHERE -- between places -- and is an answer, not a gap.
+//
+// There used to be a fallback here to the snapshot's own `loc` relation.
+// That graph went with v2 on 2026-09-21 and GET /world has not carried
+// `relations` since (schemas.py's WorldSnapshot: world_time,
+// scene_owner_entity_id, playable_entity_ids, entities -- no
+// candidates, no relations, no provenance, no deltas). The fallback was
+// reading `undefined.find`, so it did not degrade, it threw. Even when
+// the field still arrived it was wrong: the frozen v2 edge showed Wind
+// on the Mountain "at the saloon" a hundred and seventy ticks after he
+// left it (Tombstone, 2026-09-19).
+function currentLocationOf(entityId) {
+  return sceneCache.forEntity === entityId ? sceneCache.location : null;
+}
+
+async function refreshScene() {
+  if (!actingAs) return;
+  try {
+    const scene = await api(`/entities/${encodeURIComponent(actingAs)}/scene`);
+    sceneCache = { forEntity: actingAs, present: scene.present, adjacent: scene.adjacent, location: scene.location_id || null };
+    renderEntityPanel();
+    renderCurrentLocation();
+  } catch (e) {
+    // the cache stays as it was (there is no local reading to fall back to)
+  }
+}
+
+function coLocatedEntityIds() {
+  // Who is here is the engine's answer and only the engine's: scene_of
+  // reads it from the tuples (v5 §4, §11). Before the scene endpoint
+  // has answered for this entity there is no answer yet, and the honest
+  // display of that is an empty panel.
+  //
+  // The local reading that used to stand here rebuilt v2's containment
+  // chain and adjacent_to hops out of `world.relations` -- a field v3
+  // does not send -- so every path through it threw
+  // "Cannot read properties of undefined (reading 'find')". Verified
+  // live against the server, 2026-09-22: with a character picked and the
+  // scene cache not yet warm, renderEntityPanel, renderLocationsPanel,
+  // currentLocationOf and the local reading all four threw.
+  if (sceneCache.forEntity !== actingAs) return [];
+  const ids = new Set(sceneCache.present.filter(id => world.entities.some(e => e.id === id)));
+  for (const id of sceneCache.adjacent) if (entityMemories.has(id)) ids.add(id);
+  ids.delete(actingAs);
+  return [...ids];
+}
+
+// "here with you" (Marc, 2026-09-27): the panel is closed until opened from the top row; the button
+// says how many are here. The choice is remembered in this browser only -- a convenience, never state.
+function setHerePanel(open) {
+  document.getElementById("entity-column").classList.toggle("collapsed", !open);
+  document.getElementById("here-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+  try { localStorage.setItem("smritilila.hereOpen", open ? "1" : "0"); } catch (e) { /* storage may be unavailable */ }
+  labelHereToggle();
+}
+function labelHereToggle() {
+  const btn = document.getElementById("here-toggle");
+  const open = btn.getAttribute("aria-expanded") === "true";
+  let n = 0;
+  try { n = coLocatedEntityIds().length; } catch (e) { n = 0; }
+  btn.innerHTML = `here with you${n ? " (" + n + ")" : ""} ${open ? "&#9662;" : "&#9656;"}`;
+}
+document.getElementById("here-toggle").addEventListener("click", () => {
+  setHerePanel(document.getElementById("here-toggle").getAttribute("aria-expanded") !== "true");
+});
+(function () {
+  let open = false;
+  try { open = localStorage.getItem("smritilila.hereOpen") === "1"; } catch (e) { open = false; }
+  setHerePanel(open);
+})();
+
+function renderEntityPanel() {
+  const container = document.getElementById("entity-cards");
+  container.innerHTML = "";
+  const ids = coLocatedEntityIds();
+  labelHereToggle();
+  if (!ids.length) {
+    container.innerHTML = '<p class="muted">No one else is here right now.</p>';
+    return;
+  }
+  for (const id of ids) {
+    const expanded = expandedEntities.has(id);
+    const card = document.createElement("div");
+    card.className = "entity-card";
+    card.dataset.entityId = id;
+
+    const btn = document.createElement("button");
+    btn.className = "entity-toggle";
+    btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+    btn.innerHTML = `<span>${esc(labelFor(id))}</span><span class="arrow">&#9656;</span>`;
+    btn.addEventListener("click", () => {
+      if (expandedEntities.has(id)) expandedEntities.delete(id);
+      else { expandedEntities.add(id); entityTupleEpoch.set(id, -1); }   // a card being opened asks the store, whatever it holds
+      renderEntityPanel();
+    });
+    card.appendChild(btn);
+
+    if (expanded) {
+      const body = document.createElement("div");
+      body.className = "entity-card-body";
+      if (entityTupleEpoch.get(id) !== tupleEpoch) loadEntityTuples(id);   // a card opened, or opened again after a pulse, asks the store
+      fillEntityCardBody(id, body);
+      card.appendChild(body);
+    }
+    container.appendChild(card);
+  }
+}
+
+// The open card's body: the store's memories (or, until it has any, what the page was told), the latest on its own and the earlier ones behind a toggle.
+function fillEntityCardBody(id, body) {
+  const memories = entityCardMemories(id);
+  if (!memories.length) {
+    const div = document.createElement("div");
+    div.className = "memory muted";
+    div.textContent = entityTuples.get(id) === null ? "(remembering...)" : "(nothing remembered yet)";
+    body.appendChild(div);
+  } else {
+    // Push order is oldest-first, so the most recent memory is always
+    // the last element -- shown on its own; everything before it
+    // collapses behind a single toggle, same one-button-for-the-
+    // backlog shape the turn log above uses, rather than making the
+    // reader scroll a growing wall of every memory ever accumulated.
+    const older = memories.slice(0, -1);
+    const latest = memories[memories.length - 1];
+    if (older.length) {
+      const olderExpanded = expandedEntityMemories.has(id);
+      const olderBtn = document.createElement("button");
+      olderBtn.type = "button";
+      olderBtn.className = "turn-summary";
+      const count = older.length;
+      olderBtn.innerHTML = olderExpanded
+        ? `<span class="arrow" style="transform:rotate(90deg);">&#9656;</span>hide earlier memories`
+        : `<span class="arrow">&#9656;</span>${count} earlier ${count === 1 ? "memory" : "memories"}`;
+      olderBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (expandedEntityMemories.has(id)) expandedEntityMemories.delete(id);
+        else expandedEntityMemories.add(id);
+        renderEntityPanel();
+      });
+      body.appendChild(olderBtn);
+      if (olderExpanded) {
+        for (const text of older) {
+          const div = document.createElement("div");
+          div.className = "memory";
+          div.textContent = text;
+          body.appendChild(div);
+        }
+      }
+    }
+    const div = document.createElement("div");
+    div.className = "memory";
+    div.textContent = latest;
+    body.appendChild(div);
+  }
+}
+
+// A card's tuples changed: its body is swapped in one step, in that card alone (the toggles, the other cards and the place on the page stay).
+function refreshEntityCard(id) {
+  for (const card of document.getElementById("entity-cards").children) {
+    if (card.dataset.entityId !== id) continue;
+    const body = card.querySelector(".entity-card-body");
+    if (!body) return;   // collapsed: it asks again when it opens
+    const next = document.createElement("div");
+    fillEntityCardBody(id, next);
+    body.replaceChildren(...next.childNodes);
+    return;
+  }
+}
+
+// -- Narration routing: player's own line vs. everyone else's -----------
+
+function appendWitnessed(seen) {
+  // What the player witnessed while they were not acting (v3 s19): the
+  // place tuples written where they stood -- the room's own account, no
+  // one's interior. Inside a turn, shown before its "attempts" line,
+  // since they happened before it; between turns, appended to the log
+  // as they happen (2026-09-21: the tuple is the player's own the moment
+  // it is written, so it reaches them then -- see pollWitnessed).
+  const turn = currentTurn || document.getElementById("player-log");
+  for (const w of seen || []) {
+    // No heading (Marc, 2026-09-21): a witnessed entry is always where the
+    // player stands, so naming the place says nothing.
+    const div = document.createElement("div");
+    div.className = "entry witnessed";
+    const textDiv = document.createElement("div");
+    textDiv.textContent = w.text;
+    div.appendChild(textDiv);
+    if (w.said) {  // what the walls heard: the one line said aloud, verbatim, and who said it
+      const saidDiv = document.createElement("div");
+      saidDiv.className = "sara-said";
+      saidDiv.textContent = "“" + w.said + "”" + (w.said_by ? " — " + w.said_by : "");
+      div.appendChild(saidDiv);
+    }
+    if (currentTurn) turn.insertBefore(div, turn.firstChild); else turn.appendChild(div);
+  }
+  if ((seen || []).length && !currentTurn) turn.scrollTop = turn.scrollHeight;
+  if ((seen || []).length) { refreshEntityTuples(); renderEntityPanel(); }  // the scene has news: the open cards ask the store again
+}
+
+// Between the player's own actions the world moves on without them
+// (activations run in the background); what they witness of it is
+// asked for every few seconds and shown when it arrives, not held for
+// their next action. Only while the play view is up and no pulse is in
+// flight -- a pulse's own response carries whatever is pending then.
+const WITNESSED_POLL_MS = 4000;
+let witnessedPollTimer = null;
+let pulseInFlight = false;
+async function pollWitnessed() {
+  if (!actingAs || pulseInFlight || document.getElementById("play-view").classList.contains("hidden")) return;
+  try {
+    const r = await api(`/entities/${encodeURIComponent(actingAs)}/witnessed`);
+    if (r.witnessed && r.witnessed.length) appendWitnessed(r.witnessed);
+  } catch (e) { /* a quiet poll: the next pulse will carry them */ }
+}
+// Who's online (Marc, 2026-09-27), and how to sync with them (Marc, 2026-10-16: "Show all online players to everyone",
+// "Remove logged off from the list"). GET /world/sync lists every player who is online, for an owner and a guest alike, with the
+// scene and the minute each stands at. Yellow: level with you -- the same scene and the same minute, the same pulse. Light violet:
+// remote, in place or in time. Choosing a remote player who is ahead of you asks "advance to their time and go to their place? Y/N";
+// Y acts it as an ordinary action (the long-jump question, the stop where you meet them and the telling all stay as they are).
+// One who is behind you is only told so: there is nothing for you to advance. The line shows only when there is someone besides the
+// character being played. Rewritten only when it reads differently (no jumping).
+let onlinePolled = 0;
+let syncPlayers = [];
+let syncConsent = null;   // {to, until}: a Yes already given to a jump to the minute `to` (see jumpAgreed)
+function syncLevel(me, p) {
+  return !!p.scene_id && p.scene_id === me.scene_id && (me.at == null || p.at == null || me.at === p.at);
+}
+function minutesWords(n) {
+  const h = Math.floor(n / 60), m = n % 60;
+  return h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
+}
+// What choosing p would do for me: {behind} (nothing to advance), {prompt, action} (the Y/N and the action Y acts), or null.
+function syncPlan(me, p) {
+  const there = !!(me && p.scene_id && p.scene_id !== me.scene_id);
+  const delta = (me && me.at != null && p.at != null) ? p.at - me.at : 0;
+  if (delta < 0) return { behind: -delta, there };
+  const bits = [];
+  if (delta > 0) bits.push(`advance to ${p.at_text}`);
+  if (there) bits.push(`go to ${p.scene}`);
+  if (!bits.length) return null;
+  const action = there ? `I go to ${p.scene}` + (delta > 0 ? ` and wait there until ${p.at_text}.` : ".")
+                       : `I wait here until ${p.at_text}.`;
+  return { prompt: `Join ${p.label}: ${bits.join(" and ")}?`, action, to: delta > 0 ? p.at_text : null };
+}
+async function syncWith(id) {
+  if (pulseInFlight || roundSubmitted !== null) return;   // an action is under way, or already in the round
+  const me = syncPlayers.find(p => p.entity_id === actingAs);
+  const p = syncPlayers.find(q => q.entity_id === id);
+  if (!me || !p) return;
+  const plan = syncPlan(me, p);
+  if (!plan) return;
+  if (plan.behind) {
+    appendPlayerEntry("syncing", `${p.label} is behind you by ${minutesWords(plan.behind)}${plan.there ? ", at " + p.scene : ""}.`, "system");
+    return;
+  }
+  if (await askYesNo(plan.prompt)) {
+    syncConsent = plan.to ? { to: plan.to, until: Date.now() + 120000 } : null;   // the long-jump question that follows is this Yes again
+    fillAction(plan.action);
+    document.getElementById("act-form").requestSubmit();
+  }
+}
+async function refreshOnline(force) {
+  if (!force && Date.now() - onlinePolled < 15000) return;
+  onlinePolled = Date.now();
+  const el = document.getElementById("online-list");
+  let players;
+  try { players = await api(`/world/sync?as=${encodeURIComponent(actingAs || "")}`); } catch (e) { return; }
+  syncPlayers = players || [];
+  renderCurrentTime();
+  const me = syncPlayers.find(p => p.entity_id === actingAs);
+  const others = syncPlayers.filter(p => p.entity_id !== actingAs);
+  if (!others.length) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  const line = document.createElement("span");
+  line.appendChild(document.createTextNode("players online: "));   // Marc, 2026-10-16: a name in the line was not read as a person at play
+  syncPlayers.forEach((p, i) => {
+    const s = document.createElement("span");
+    if (p.entity_id === actingAs) {
+      s.textContent = "you";
+      s.className = "on";
+    } else {
+      const level = !!me && syncLevel(me, p);
+      s.textContent = p.label;
+      s.className = level ? "same" : "remote";
+      const where = [p.scene, p.at_text].filter(Boolean).join(", ");
+      const plan = !level && me ? syncPlan(me, p) : null;   // Marc, 2026-10-17: one in your past cannot be synced with, and the hover says so
+      s.title = level ? `${p.label}: level with you, ${where}`
+        : (plan && plan.behind) ? `${p.label}: ${where}. Can't sync with a past time (${minutesWords(plan.behind)} behind you).`
+        : `${p.label}: ${where}. Choose to sync with them.`;
+      if (!level) { s.dataset.id = p.entity_id; s.tabIndex = 0; s.setAttribute("role", "button"); }
+    }
+    line.appendChild(s);
+    if (i < syncPlayers.length - 1) line.appendChild(document.createTextNode(" · "));
+  });
+  if (el.innerHTML !== line.innerHTML) el.innerHTML = line.innerHTML;
+  el.classList.remove("hidden");
+}
+document.getElementById("online-list").addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-id]");
+  if (t) syncWith(t.dataset.id);
+});
+document.getElementById("online-list").addEventListener("keydown", (ev) => {
+  const t = ev.target.closest && ev.target.closest("[data-id]");
+  if (t && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); syncWith(t.dataset.id); }
+});
+
+// while a round waits on its telling, its state is asked every second, not every four (the telling reached the
+// page up to 4 s after it was written); only the round -- the witnessed feed and who is online keep their pace
+const ROUND_PENDING_POLL_MS = 1000;
+let roundPendingTimer = null;
+
+function startWitnessedPoll() {
+  if (roundPendingTimer === null) roundPendingTimer = setInterval(() => {
+    if (roundSubmitted !== null || (lastRound && (lastRound.open || lastRound.running))) pollRound();
+  }, ROUND_PENDING_POLL_MS);
+  if (witnessedPollTimer === null) witnessedPollTimer = setInterval(() => { pollWitnessed(); pollRound(); refreshOnline(); }, WITNESSED_POLL_MS);
+  if (heartbeatTimer === null) heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS);
+  refreshOnline(true);
+}
+
+// v5 §37: presence. Someone at the page -- on screen, and touched since the last beat -- keeps their character
+// online without acting, so they can wait for another player to catch up. An open tab nobody touches sends nothing
+// (an open tab is not a player): thirty minutes after the last touch they are away, as before. The server never
+// brings back a character logged off by a heartbeat; only acting or coming back online does.
+const HEARTBEAT_MS = 5 * 60 * 1000;
+let heartbeatTimer = null;
+let touchedSinceBeat = false;
+for (const ev of ["keydown", "pointerdown", "wheel", "touchstart", "scroll"]) {
+  window.addEventListener(ev, () => { touchedSinceBeat = true; }, { passive: true, capture: true });
+}
+function heartbeat() {
+  if (!actingAs || document.visibilityState !== "visible" || !touchedSinceBeat) return;
+  touchedSinceBeat = false;
+  api(`/players/${encodeURIComponent(actingAs)}/heartbeat`, "POST").catch(() => {});
+}
+
+function routeNarrations(narrations, sara, detail, witnessed) {
+  appendWitnessed((witnessed || {})[actingAs] || []);
+  for (const [entityId, narration] of Object.entries(narrations)) {
+    if (entityId === actingAs) {
+      appendPlayerEntry(labelFor(entityId), narration, "you", (sara || {})[entityId], (detail || {})[entityId], entityId);
+    } else {
+      if (!entityMemories.has(entityId)) entityMemories.set(entityId, []);
+      entityMemories.get(entityId).push(narration);
+    }
+  }
+  refreshEntityTuples();   // the pulse is committed: every open card asks the store again, quietly
+  renderEntityPanel();
+}
+
+// -- Character switcher: which playable entity POST /pulses acts as -----
+
+function renderCharacterSwitcher() {
+  const select = document.getElementById("character-select");
+  select.innerHTML = "";
+  for (const id of world.playable_entity_ids) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = labelFor(id);
+    select.appendChild(opt);
+  }
+  if (!actingAs || !world.playable_entity_ids.includes(actingAs)) {
+    actingAs = world.scene_owner_entity_id;
+  }
+  select.value = actingAs;
+  // Deliberately never disabled, even with only one option: browsers'
+  // native disabled-<select> styling tends to override custom border/
+  // background CSS (Chrome/Windows in particular washes it out to near-
+  // invisible against a dark page), which made the control disappear
+  // entirely with a single playable character -- a real, observed bug.
+  // Selecting the same lone option again is a harmless no-op, so there's
+  // nothing to actually guard against by disabling it.
+}
+
+// -- World state panel (debug/visibility table) --------------------------
+
+function renderStatePanel() {
+  const eBody = document.querySelector("#entities-table tbody");
+  eBody.innerHTML = "";
+  for (const e of world.entities) {
+    // A star for whoever you're currently acting as, a dimmer dot for any
+    // other playable-but-not-active character (e.g. one you joined but
+    // haven't switched to yet).
+    let marker = "";
+    if (e.id === actingAs) marker = "&#9733; ";
+    else if (world.playable_entity_ids.includes(e.id)) marker = "&#183; ";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${marker}${esc(e.id)}</td><td>${esc((e.labels || []).join(", "))}</td>`;
+    eBody.appendChild(tr);
+  }
+}
+
+// -- Where the actor stands: the "at ..." label in the play bar.
+
+function renderCurrentLocation() {
+  const label = document.getElementById("current-location-label");
+  if (!world || !actingAs) { label.textContent = ""; return; }
+  const here = currentLocationOf(actingAs);
+  label.textContent = here !== null ? labelFor(here) : "nowhere -- between places";
+  renderCurrentTime();
+}
+
+// The day and time the character you play stands at, at the end of the play bar (Marc, 2026-10-19). It is the player's own
+// clock as /world/sync says it ("Monday, 5 October 2026, 7:13 in the evening", or "the first day, 11:40 at night" in a world
+// that counts days); a world with no clock says nothing, and so does the bar.
+function renderCurrentTime() {
+  const el = document.getElementById("current-time-label");
+  const me = actingAs ? syncPlayers.find(p => p.entity_id === actingAs) : null;
+  el.textContent = me && me.at_text ? "· " + me.at_text : "";
+}
+
+// -- Suggested action: a one-click alternative to typing free text ------
+
+function renderSuggestedAction() {
+  const btn = document.getElementById("suggested-action-btn");
+  if (!suggestedNextAction) {
+    btn.hidden = true;
+  } else {
+    btn.hidden = false;
+    btn.innerHTML = `<span class="arrow">&#8594;</span>${esc(suggestedNextAction)}`;
+  }
+
+  const memoryBtn = document.getElementById("suggested-action-memory-btn");
+  if (!suggestedNextActionFromMemory) {
+    memoryBtn.hidden = true;
+  } else {
+    memoryBtn.hidden = false;
+    // A distinct glyph (recall/circular arrow, not the scene one's plain
+    // arrow) so the two read as different KINDS of suggestion, not two
+    // copies of the same button.
+    memoryBtn.innerHTML = `<span class="arrow">&#8635;</span>${esc(suggestedNextActionFromMemory)}`;
+  }
+}
+
+function showPlayView() {
+  document.getElementById("continue-view").classList.remove("open");
+  document.getElementById("new-character-view").classList.add("hidden");
+  document.getElementById("new-world-view").classList.add("hidden");
+  document.getElementById("new-character-btn").classList.add("hidden"); // the opening screen's
+  document.getElementById("play-view").classList.remove("hidden");
+  renderCharacterSwitcher();
+  refreshPlayerControls();
+  renderStatePanel();
+  renderEntityPanel();
+  renderCurrentLocation();
+  startWitnessedPoll();
+}
+
+async function refreshWorld() {
+  world = await api("/world");
+  // Keeps actingAs valid and the switcher's option list current even for
+  // callers that don't also call showPlayView() again (e.g. after a
+  // pulse, or after a join) -- renderStatePanel/renderEntityPanel below
+  // both read actingAs too, so this must run first. renderEntityPanel
+  // also needs to re-run here on its own even when routeNarrations
+  // doesn't fire this round (e.g. after a switch with no new
+  // narrations) -- who's co-located can change from movement alone.
+  renderCharacterSwitcher();
+  renderStatePanel();
+  renderEntityPanel();
+  renderCurrentLocation();
+  refreshScene(); // the server's own scene; re-renders the panel when it lands
+  refreshOnline(true); // the clock in the play bar moves with every pulse
+  return world;
+}
+
+// -- Player controls (Marc, 2026-09-24): what this character does while you
+// are offline, and log off. (The short-narration on/off was removed 2026-10-19.)
+
+// Offline -- frozen or waiting (v5 §37, POST /players/{pid}/autonomy): the
+// world's setting for this character, persisted. Frozen: out of the world
+// while you are away. Waiting (Marc, 2026-10-01): in the world, no turn of
+// their own until someone interacts. Active -- the world acting for a player --
+// is gone (v4.58, Marc, 2026-10-02).
+function renderOfflineToggle(autonomous, waiting) {
+  const btn = document.getElementById("offline-toggle");
+  btn.setAttribute("aria-pressed", String(autonomous));
+  btn.dataset.mode = autonomous ? "waiting" : "frozen";  // allowed is waiting (v4.58)
+  btn.textContent = btn.dataset.mode;
+}
+
+async function refreshPlayerControls() {
+  if (!actingAs) return;
+  try {
+    const players = await api("/players");
+    const me = players.find(p => p.entity_id === actingAs);
+    if (me) renderOfflineToggle(me.autonomous, me.waiting);
+  } catch (e) { /* the toggle keeps what it showed */ }
+}
+
+document.getElementById("offline-toggle").addEventListener("click", async () => {
+  const btn = document.getElementById("offline-toggle");
+  // frozen <-> waiting
+  const next = btn.dataset.mode === "waiting" ? "frozen" : "waiting";
+  btn.disabled = true;
+  try {
+    const me = await api(`/players/${encodeURIComponent(actingAs)}/autonomy`, "POST",
+                         { allow: next !== "frozen", wait: next === "waiting" });
+    renderOfflineToggle(me.autonomous, me.waiting);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Log off: this character goes offline now (POST /players/{pid}/presence),
+// frozen or waiting as set above, and the page returns to the opening screen.
+document.getElementById("logoff-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("logoff-btn");
+  btn.disabled = true;
+  try {
+    await api(`/players/${encodeURIComponent(actingAs)}/presence`, "POST", { online: false });
+    location.reload();
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+  }
+});
+
+// Retire (POST /players/{pid}/retire; Marc, 2026-10-01): not reversible, so
+// it is asked for by name -- the button stays off until the name is typed
+// back, and the server checks the same name. The panel holds the character
+// it was opened for, whatever the selector does meanwhile.
+let retiring = null;
+
+function closeRetire() {
+  retiring = null;
+  document.getElementById("retire-panel").classList.add("hidden");
+  document.getElementById("retire-input").value = "";
+  document.getElementById("retire-status").textContent = "";
+}
+
+function retireTyped() {
+  return retiring && document.getElementById("retire-input").value.trim().toLowerCase() === retiring.name.trim().toLowerCase();
+}
+
+document.getElementById("retire-btn").addEventListener("click", () => {
+  if (!actingAs) return;
+  retiring = { id: actingAs, name: labelFor(actingAs) };
+  document.getElementById("retire-name").textContent = retiring.name;
+  document.getElementById("retire-name-typed").textContent = retiring.name;
+  document.getElementById("retire-input").value = "";
+  document.getElementById("retire-confirm-btn").disabled = true;
+  document.getElementById("retire-status").textContent = "";
+  document.getElementById("retire-panel").classList.remove("hidden");
+  document.getElementById("retire-input").focus();
+});
+
+document.getElementById("retire-input").addEventListener("input", () => {
+  document.getElementById("retire-confirm-btn").disabled = !retireTyped();
+});
+
+document.getElementById("retire-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") closeRetire();  // Enter does nothing: the button is pressed on purpose
+});
+
+document.getElementById("retire-cancel-btn").addEventListener("click", closeRetire);
+
+document.getElementById("character-select").addEventListener("change", closeRetire);
+
+document.getElementById("retire-confirm-btn").addEventListener("click", async () => {
+  if (!retireTyped()) return;
+  const btn = document.getElementById("retire-confirm-btn");
+  btn.disabled = true;
+  try {
+    await api(`/players/${encodeURIComponent(retiring.id)}/retire`, "POST",
+              { confirm: document.getElementById("retire-input").value });
+    document.getElementById("retire-status").textContent = `${retiring.name} is retired.`;
+    location.reload();
+  } catch (e) {
+    document.getElementById("retire-status").textContent = e.message;
+    btn.disabled = !retireTyped();
+  }
+});
+
+// -- Recap: re-orient after switching to or resuming a character --------
+
+async function showRecap(entityId) {
+  // Best-effort only -- a failed fetch here must never block the switch
+  // itself, which has already happened by the time this is called.
+  let recap;
+  try {
+    recap = await api(`/entities/${encodeURIComponent(entityId)}/recap`);
+  } catch (e) {
+    return;
+  }
+  // its own turn (Marc, 2026-10-02): the last narration shown on coming back folds away with the earlier turns
+  // once the next telling is in, as every narration does -- outside any turn, it stayed open for good
+  startTurn();
+  if (recap.location_id) {
+    appendPlayerEntry("system", "Currently at " + labelFor(recap.location_id) + ".", "system");
+  }
+  if (recap.last_narration) {
+    appendPlayerEntry(labelFor(entityId), recap.last_narration, "you");
+  }
+  endTurn();
+  applyTurnCollapse();
+}
+
+// A switch clears the left column (Marc, 2026-09-24): each switch used to
+// stack another "currently at" and recap on the previous character's.
+function clearPlayerLog() {
+  document.getElementById("player-log").innerHTML = "";
+  turnElements.length = 0;
+  olderTurnsExpanded = false;
+  olderTurnsToggleEl = null; // its DOM node went with the log
+  currentTurn = null;
+}
+
+document.getElementById("character-select").addEventListener("change", async (ev) => {
+  actingAs = ev.target.value;
+  roundSubmitted = null; roundTurn = null; roundAgreed = false; renderRoundStatus(null);  // the other's round is theirs
+  clearPlayerLog();
+  appendPlayerEntry("system", "You are now acting as " + labelFor(actingAs) + ".", "system");
+  renderStatePanel();
+  renderEntityPanel(); // who's "here" depends on actingAs's own location
+  refreshScene();
+  renderCurrentLocation();
+  refreshOnline(true); // and so does whose clock the bar shows
+  suggestedNextAction = ""; // belonged to whichever character just switched away
+  suggestedNextActionFromMemory = "";
+  renderSuggestedAction();
+  refreshPlayerControls(); // offline: frozen/waiting is per character
+  await showRecap(actingAs);
+});
+
+document.getElementById("state-toggle").addEventListener("click", () => {
+  document.getElementById("state-panel").classList.toggle("open");
+});
+
+// -- New character (Marc, 2026-09-24): from the opening screen, beside
+// the world selector. A newcomer chooses where to arrive among the
+// world's busiest places and wherever a player now stands
+// (GET /world/locations), and plays as who they just made.
+
+async function showNewCharacterView() {
+  document.getElementById("continue-view").classList.remove("open");
+  document.getElementById("new-world-view").classList.add("hidden");
+  document.getElementById("new-character-view").classList.remove("hidden");
+  const box = document.getElementById("nc-locations");
+  box.innerHTML = "<p class='muted'>loading...</p>";
+  let locs;
+  try {
+    locs = await api("/world/locations");
+  } catch (e) {
+    box.innerHTML = "";
+    box.textContent = "couldn't load where to arrive: " + e.message;
+    return;
+  }
+  box.innerHTML = "";
+  const head = document.createElement("p");
+  head.className = "muted";
+  head.textContent = locs.length ? "Where you arrive:" : "This world has nowhere to arrive yet.";
+  box.appendChild(head);
+  locs.forEach((loc, i) => {
+    const label = document.createElement("label");
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "nc-location";
+    radio.value = loc.location_id;
+    radio.checked = i === 0;
+    label.appendChild(radio);
+    const who = loc.players_here.length ? ` -- ${loc.players_here.join(", ")} ${loc.players_here.length === 1 ? "is" : "are"} here` : "";
+    label.appendChild(document.createTextNode(loc.label));
+    const note = document.createElement("span");
+    note.className = "muted";
+    note.textContent = ` (${loc.memories} ${loc.memories === 1 ? "memory" : "memories"} formed here${who})`;
+    label.appendChild(note);
+    box.appendChild(label);
+  });
+  // or anywhere, in the player's own words (Marc, 2026-10-01): a place the world has, or a new one
+  const own = document.createElement("label");
+  const ownRadio = document.createElement("input");
+  ownRadio.type = "radio";
+  ownRadio.name = "nc-location";
+  ownRadio.value = "";
+  ownRadio.checked = !locs.length;
+  own.appendChild(ownRadio);
+  own.appendChild(document.createTextNode("somewhere else -- describe where you start"));
+  box.appendChild(own);
+  const where = document.createElement("textarea");
+  where.id = "nc-where";
+  where.rows = 2;
+  where.placeholder = "e.g. beneath the great tree in the fens, where my hoard lies -- a place the world has, or a new one";
+  where.disabled = !ownRadio.checked;
+  box.appendChild(where);
+  box.querySelectorAll("input[name=nc-location]").forEach(r => r.addEventListener("change", () => {
+    where.disabled = !ownRadio.checked;
+    if (ownRadio.checked) where.focus();
+  }));
+  where.addEventListener("focus", () => { ownRadio.checked = true; where.disabled = false; });
+  document.getElementById("nc-self").focus();
+}
+
+document.getElementById("new-character-btn").addEventListener("click", showNewCharacterView);
+
+document.getElementById("nc-cancel-btn").addEventListener("click", () => {
+  document.getElementById("new-character-view").classList.add("hidden");
+  document.getElementById("continue-view").classList.add("open");
+});
+
+document.getElementById("nc-arrive-btn").addEventListener("click", async () => {
+  const text = document.getElementById("nc-self").value.trim();
+  const chosen = document.querySelector("input[name=nc-location]:checked");
+  if (!text) { alert("Say who you are first."); return; }
+  if (!chosen) { alert("Choose where you arrive."); return; }
+  const whereEl = document.getElementById("nc-where");
+  const where = chosen.value ? "" : (whereEl ? whereEl.value.trim() : "");
+  if (!chosen.value && !where) { alert("Describe where you start."); return; }
+  const btn = document.getElementById("nc-arrive-btn");
+  btn.disabled = true; btn.textContent = "Arriving...";
+  try {
+    const result = await api("/world/join", "POST", { entry_location_id: chosen.value, self_description: text, start_description: where });
+    // You play as who you just made: the act box, the suggestions and the
+    // switcher are theirs from here (actingAs is set before refreshWorld so
+    // renderCharacterSwitcher keeps it).
+    actingAs = result.player_entity_id;
+    suggestedNextAction = "";
+    suggestedNextActionFromMemory = "";
+    renderSuggestedAction();
+    await refreshWorld();
+    showPlayView();
+    routeNarrations(result.narrations);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Arrive";
+  }
+});
+
+// -- New world: everything that makes a world lives behind the corner
+// button (Marc, 2026-09-24). Its screen has since been rebuilt (below); the old forms
+// (a new database, genesis in this one, the starter-world reset) are gone
+// from the page -- /worlds/create, /genesis and /world/clear remain.
+
+let newWorldReturnsToPlay = false;
+let worldExists = false; // set by init: is there a world here to expand
+
+// The corner button opens the builder and, while it is open, reads "back" (Marc, 2026-10-06). The world picker and its line are
+// the page's top; they are not the builder's, so they step aside while it is open.
+let builderOpen = false;
+const GREETING = "What world do you want to make? A real place and time, a book or a film, a present-day city, or something you invent: say as much or as little as you like and I will ask for the rest. The brief on the right fills in as we talk, and you can change it any time.";
+const builder = { messages: [], busy: false, maps: [], look: [] };   // maps: the saved maps picked (their ids); look: those the builder has not yet been shown
+
+function setBuilderOpen(open) {
+  builderOpen = open;
+  const corner = document.getElementById("new-world-corner");
+  corner.textContent = open ? "back" : "new world";
+  corner.title = open ? "Leave the builder" : "Everything that makes a world";
+  document.body.classList.toggle("building", open);
+  if (open) {
+    newWorldReturnsToPlay = !document.getElementById("play-view").classList.contains("hidden");
+    document.getElementById("continue-view").classList.remove("open");
+    document.getElementById("new-character-view").classList.add("hidden");
+    document.getElementById("play-view").classList.add("hidden");
+    document.getElementById("new-world-view").classList.remove("hidden");
+    if (!document.getElementById("builder-log").children.length) addBuilderMessage("assistant", GREETING);
+    document.getElementById("builder-input").focus();
+  } else {
+    document.getElementById("new-world-view").classList.add("hidden");
+    if (newWorldReturnsToPlay) document.getElementById("play-view").classList.remove("hidden");
+    else document.getElementById("continue-view").classList.add("open");
+  }
+}
+document.getElementById("new-world-corner").addEventListener("click", () => setBuilderOpen(!builderOpen));
+
+const BRIEF_IDS = { name: "nw-name", source: "nw-source", where_when: "nw-where-when", begins: "nw-begins", different: "nw-different", feel: "nw-feel", breadth: "nw-breadth" };
+
+// Maps (Marc, 2026-10-23): the owner picks saved map images, up to three. The builder looks at a newly picked map once, with the next
+// message sent; a build copies each into the new world and has it read there, which makes a proposal for a god to review.
+const MAX_BUILDER_MAPS = 3;
+function renderMapChips() {
+  const box = document.getElementById("nw-maps");
+  box.replaceChildren();
+  for (const id of builder.maps) {
+    const chip = document.createElement("span");
+    chip.className = "nw-map-chip";
+    chip.append(id.split("/").pop() + (builder.look.includes(id) ? " (the builder will look at it with your next message)" : ""));
+    const x = document.createElement("button");
+    x.type = "button"; x.textContent = "x"; x.title = "take this map out";
+    x.addEventListener("click", () => {
+      builder.maps = builder.maps.filter(m => m !== id);
+      builder.look = builder.look.filter(m => m !== id);
+      renderMapChips();
+      for (const card of document.querySelectorAll("#nw-map-picker .map-card")) if (card.dataset.id === id) card.classList.remove("on");
+    });
+    chip.appendChild(x);
+    box.appendChild(chip);
+  }
+}
+async function toggleMapPicker() {
+  const picker = document.getElementById("nw-map-picker");
+  if (!picker.classList.contains("hidden")) { picker.classList.add("hidden"); return; }
+  picker.classList.remove("hidden");
+  await fillMapPicker();
+}
+async function fillMapPicker() {
+  const picker = document.getElementById("nw-map-picker");
+  picker.replaceChildren();
+  let maps;
+  try { maps = await api("/builder/maps", "GET"); }
+  catch (e) {
+    // a server started before maps were added has no such route (the page is read fresh from disk; a route is only there after a restart)
+    picker.textContent = e.message.startsWith("404") ? "This server does not know about maps yet: it was started before they were added. Restart it, then try again." : "Could not list the saved maps: " + e.message;
+    return;
+  }
+  if (!maps.length) { picker.textContent = "No saved maps: put an image (png, jpeg, webp or gif) in a folder under the maps folder of the data directory."; return; }
+  for (const m of maps) {
+    const card = document.createElement("div");
+    card.className = "map-card" + (builder.maps.includes(m.id) ? " on" : "");
+    card.dataset.id = m.id;
+    const img = document.createElement("img");
+    img.loading = "lazy"; img.alt = m.name; img.src = API + "/builder/maps/file?id=" + encodeURIComponent(m.id);
+    const cap = document.createElement("div");
+    cap.textContent = m.folder + " / " + m.name;
+    card.append(img, cap);
+    card.addEventListener("click", () => {
+      if (builder.maps.includes(m.id)) {
+        builder.maps = builder.maps.filter(x => x !== m.id);
+        builder.look = builder.look.filter(x => x !== m.id);
+        card.classList.remove("on");
+      } else if (builder.maps.length >= MAX_BUILDER_MAPS) {
+        alert("Up to " + MAX_BUILDER_MAPS + " maps.");
+        return;
+      } else {
+        builder.maps.push(m.id);
+        builder.look.push(m.id);
+        card.classList.add("on");
+      }
+      renderMapChips();
+    });
+    picker.appendChild(card);
+  }
+}
+document.getElementById("nw-map-btn").addEventListener("click", toggleMapPicker);
+
+// Browsing for an image (Marc, 2026-10-23: "Should allow file browsing for images"): the file chosen on this computer is sent to the server as it is,
+// kept with the saved maps (maps/uploaded/), and picked at once.
+document.getElementById("nw-map-browse").addEventListener("click", () => document.getElementById("nw-map-file").click());
+document.getElementById("nw-map-file").addEventListener("change", async ev => {
+  const file = ev.target.files[0];
+  ev.target.value = "";   // the same file may be chosen again
+  if (!file) return;
+  const status = document.getElementById("nw-status");
+  if (builder.maps.length >= MAX_BUILDER_MAPS) { alert("Up to " + MAX_BUILDER_MAPS + " maps: take one out first."); return; }
+  status.textContent = "Saving " + file.name + "...";
+  try {
+    const resp = await fetch(API + "/builder/maps?name=" + encodeURIComponent(file.name), { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+    const text = await resp.text();
+    let saved = null;
+    try { saved = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON body */ }
+    if (!resp.ok) throw new Error(`${resp.status}: ${JSON.stringify((saved && saved.detail) || text || resp.statusText)}`);
+    if (!builder.maps.includes(saved.id)) { builder.maps.push(saved.id); builder.look.push(saved.id); }
+    renderMapChips();
+    if (!document.getElementById("nw-map-picker").classList.contains("hidden")) await fillMapPicker();
+    status.textContent = "";
+  } catch (e) {
+    status.textContent = e.message.startsWith("404") ? "This server does not know about maps yet: it was started before they were added. Restart it, then try again."
+                                                     : "That image could not be saved: " + e.message;
+  }
+});
+function readBrief() {
+  const d = {};
+  for (const [k, id] of Object.entries(BRIEF_IDS)) d[k] = document.getElementById(id).value.trim();
+  return d;
+}
+function addBuilderMessage(role, text, cls) {
+  const el = document.createElement("div");
+  el.className = "bmsg " + role + (cls ? " " + cls : "");
+  el.textContent = text;
+  const log = document.getElementById("builder-log");
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+function applyPatch(patch) {
+  for (const [k, v] of Object.entries(patch || {})) {
+    const el = document.getElementById(BRIEF_IDS[k]);
+    if (!el) continue;
+    el.value = v;
+    el.classList.remove("nw-changed");
+    void el.offsetWidth; // restart the flash
+    el.classList.add("nw-changed");
+  }
+}
+async function builderSend() {
+  const input = document.getElementById("builder-input");
+  const text = input.value.trim();
+  if (!text || builder.busy) return;
+  input.value = "";
+  builder.messages.push({ role: "user", content: text });
+  addBuilderMessage("user", text);
+  builder.busy = true;
+  document.getElementById("builder-send").disabled = true;
+  const thinking = addBuilderMessage("assistant", "...", "thinking");
+  try {
+    const r = await api("/builder/turn", "POST", { messages: builder.messages, draft: readBrief(), look: builder.look });
+    thinking.remove();
+    builder.messages.push({ role: "assistant", content: r.message });
+    addBuilderMessage("assistant", r.message);
+    if (builder.look.length) { builder.look = []; renderMapChips(); }   // shown once: what it saw is in the talk now
+    applyPatch(r.patch);
+    document.getElementById("nw-status").textContent = r.ready ? "The brief is ready: preview it, or build the world." : "";
+  } catch (e) {
+    thinking.remove();
+    addBuilderMessage("assistant", "I could not answer: " + e.message + " (what you wrote is kept; send again)", "error");
+  } finally {
+    builder.busy = false;
+    document.getElementById("builder-send").disabled = false;
+    input.focus();
+  }
+}
+document.getElementById("builder-send").addEventListener("click", builderSend);
+document.getElementById("builder-input").addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); builderSend(); }
+});
+
+document.getElementById("nw-preview-btn").addEventListener("click", async () => {
+  const brief = readBrief();
+  if (!brief.name || !brief.source || !brief.where_when) { alert("A preview needs a name, a source, and where and when."); return; }
+  const btn = document.getElementById("nw-preview-btn");
+  const status = document.getElementById("nw-status");
+  const box = document.getElementById("builder-preview");
+  btn.disabled = true; status.textContent = "Writing a preview...";
+  try {
+    const p = await api("/builder/preview", "POST", { draft: brief });
+    box.replaceChildren();
+    const add = (tag, text, cls) => { const el = document.createElement(tag); el.textContent = text; if (cls) el.className = cls; box.appendChild(el); return el; };
+    add("p", p.line).style.fontStyle = "italic";
+    add("p", p.opening);
+    for (const [title, items, cls] of [["Places", p.places], ["People", p.people], ["Check before building", p.cautions, "nw-caution"]]) {
+      if (!items || !items.length) continue;
+      add("h4", title);
+      const ul = document.createElement("ul");
+      for (const it of items) { const li = document.createElement("li"); li.textContent = it; if (cls) li.className = cls; ul.appendChild(li); }
+      box.appendChild(ul);
+    }
+    box.classList.remove("hidden");
+    status.textContent = "";
+  } catch (e) {
+    status.textContent = "";
+    alert(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Build (2026-10-06): a world is made on a server of its own -- every server is pinned to its own world and will not make another,
+// so building from the page was a 409 -- as a job the server runs and this page polls, because seeding takes minutes at wide breadth.
+document.getElementById("nw-create-btn").addEventListener("click", async () => {
+  const brief = readBrief();
+  const name = brief.name;
+  if (!name) { alert("Name the world first."); return; }
+  if (!brief.source) { alert("Say its source: history, a book or a film, or the present day, and which."); return; }
+  if (!brief.where_when) { alert("Say where and when it is."); return; }
+  const btn = document.getElementById("nw-create-btn");
+  const status = document.getElementById("nw-status");
+  btn.disabled = true; btn.textContent = "Building...";
+  try {
+    const started = await api("/builder/build", "POST", { name, draft: brief, messages: builder.messages, maps: builder.maps });
+    let s = null, failures = 0;
+    while (!s || !s.done) {
+      await new Promise(r => setTimeout(r, 2000));
+      try { s = await api("/builder/build/" + encodeURIComponent(started.job), "GET"); failures = 0; }
+      catch (e) { if (++failures >= 6) throw e; continue; }   // the tunnel may drop a poll; the job goes on
+      status.textContent = s.done ? "" : s.step + "...";
+    }
+    if (s.error) throw new Error(s.error);
+    const r = s.result;
+    const link = document.createElement("a");
+    link.href = r.address; link.textContent = r.address; link.target = "_blank"; link.rel = "noopener";
+    const grownLines = [];
+    if (r.grown) {
+      const line = document.createElement("div");
+      line.textContent = `Grown outward: ${r.grown.rings} ring${r.grown.rings === 1 ? "" : "s"}, ${r.grown.places} places and ${r.grown.people} people added`
+        + (r.grown.error ? `; it stopped at ${r.grown.error}` : r.grown.stopped ? `; it stopped early (${r.grown.stopped})` : "") + ".";
+      grownLines.push(line);
+    }
+    const mapLines = (r.maps || []).map(m => {
+      const line = document.createElement("div");
+      line.textContent = m.proposal ? `Map ${m.image}: read. A proposal (${m.proposal}) waits for a god to review it; nothing is planted.`
+                                    : `Map ${m.image}: not read (${m.error}). The world is built; the map is kept in its maps folder.`;
+      return line;
+    });
+    status.replaceChildren(`${r.name} is built, on its own server: `, link,
+      r.public ? "." : ". It is private, with no public address yet: until it has one it opens only from this machine.", ...grownLines, ...mapLines);
+    btn.textContent = "Built";
+  } catch (e) {
+    status.textContent = "The build stopped: " + e.message + " Press Build again to try again; what was made is kept, and a retry seeds it rather than making another.";
+    btn.disabled = false; btn.textContent = "Build the world";
+  }
+});
+
+// v5 §22 kāla: a pulse that would jump ahead in time -- a long action -- is
+// held, and asks its player first (a player is never asked to wait for a
+// scene closed until later: v5 §21, it is open to them). Y goes
+// on; N does nothing at all. Resolves to true for Y. Asked inside the
+// turn, so what the answer brings shows below it (Marc, 2026-09-25).
+function askYesNo(prompt) {
+  return new Promise(resolve => {
+    const log = currentTurn || document.getElementById("player-log");
+    const div = document.createElement("div");
+    div.className = "entry confirm";
+    const text = document.createElement("div");
+    text.textContent = prompt;
+    const yn = document.createElement("div");
+    yn.className = "yn";
+    for (const [label, answer] of [["Y", true], ["N", false]]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        yn.remove();
+        text.textContent = prompt + " " + label;
+        resolve(answer);
+      });
+      yn.appendChild(b);
+    }
+    div.appendChild(text);
+    div.appendChild(yn);
+    log.appendChild(div);
+    div.scrollIntoView({ block: "end" });
+  });
+}
+
+// Marc, 2026-10-17: choosing a player in the online line asked "Join X: advance to T?", and the engine then asked "You are about to jump ahead ... (to T). Proceed?":
+// the same jump twice. The first Yes stands for the second, but only for a question that names the same T, once, and within two minutes; the answer is shown in the
+// log as the question is, marked as already given. Any other long jump is asked as before.
+function jumpAgreed(confirm) {
+  const c = syncConsent;
+  syncConsent = null;
+  if (!c || Date.now() > c.until || !confirm || confirm.kind !== "long" || typeof confirm.prompt !== "string" || !confirm.prompt.includes(`(to ${c.to})`)) return false;
+  const log = currentTurn || document.getElementById("player-log");
+  const div = document.createElement("div");
+  div.className = "entry confirm";
+  div.textContent = confirm.prompt + " Y (already agreed above)";
+  log.appendChild(div);
+  return true;
+}
+
+// -- Saṅgama (Marc, 2026-09-27): players standing together act as one round.
+// Your action joins the round and stays in the box; Go, a button of its own,
+// closes the round. Typing takes your action back out (Act again to
+// put it in). When everyone there has acted, the round is written by
+// itself, and each of you is told it. What the others entered is never
+// shown before then -- only that they have acted.
+let roundSubmitted = null;   // the text this player has in the open round, or null
+let roundTurn = null;        // the turn their attempt opened: the telling lands in it
+let roundAsking = false;     // a jump question from the round is on screen
+let roundAgreed = false;     // they said yes to the round's jump; waiting on the others
+
+// Go (Marc, 2026-09-27): at the far right, only in a round, and only once
+// everyone yet to act has not typed for twenty seconds (the server counts;
+// the page counts down between polls).
+let goAt = 0;
+// Sized only when its text or its width changed (Marc, 2026-09-27: "the UI on the phone keeps jumping
+// around" -- re-measured on every 4 s poll and every countdown second, the box collapsed to one line and
+// grew back, the page height changed, and a phone browser moved the scroll each time).
+let fitKey = "";
+function fitActInput() {
+  const input = document.getElementById("act-input");
+  const key = input.value + "|" + input.clientWidth;
+  if (key === fitKey) return;
+  fitKey = key;
+  const border = () => input.offsetHeight - input.clientHeight;
+  input.style.height = "auto";
+  input.style.height = (input.scrollHeight + border()) + "px";
+  // a taller box can bring the page's scrollbar in, narrowing it, and the text wraps again: grow until it all shows
+  for (let i = 0; i < 3 && input.scrollHeight > input.clientHeight; i++) input.style.height = (input.scrollHeight + border()) + "px";
+}
+
+function setActButton() {
+  const input = document.getElementById("act-input");
+  fitActInput();
+  const btn = document.getElementById("act-btn");
+  const goBtn = document.getElementById("go-btn");
+  const inRound = !!(lastRound && lastRound.members && lastRound.members.length > 1 && lastRound.open);
+  goBtn.classList.toggle("hidden", !inRound);
+  if (pulseInFlight) return;
+  const busy = roundAgreed || (lastRound && (lastRound.running || (lastRound.waiting_on || []).length));  // written, or waiting on a yes
+  const submitted = roundSubmitted !== null && input.value.trim() === roundSubmitted;
+  btn.textContent = busy ? "..." : "Act";
+  btn.disabled = busy || submitted;
+  const wait = Math.max(0, Math.ceil((goAt - Date.now()) / 1000));
+  goBtn.textContent = wait > 0 && submitted && !busy ? `Go ${wait}s` : "Go";
+  goBtn.disabled = busy || !submitted || wait > 0;
+}
+setInterval(() => { if (goAt > Date.now() - 1500) setActButton(); }, 1000);  // the countdown
+
+// they are writing: said to the server at most every few seconds, so Go waits for them
+let typedSent = 0;
+function reportTyping() {
+  if (!actingAs || !lastRound || !lastRound.members || lastRound.members.length < 2) return;
+  if (Date.now() - typedSent < 3000) return;
+  typedSent = Date.now();
+  api(`/rounds/${encodeURIComponent(actingAs)}/typing`, "POST").catch(() => {});
+}
+
+let lastRound = null;
+function renderRoundStatus(r) {
+  lastRound = r;
+  goAt = r && r.go_in ? Date.now() + r.go_in * 1000 : 0;
+  const el = document.getElementById("round-status");
+  if (!r || !r.members || r.members.length < 2) { el.classList.add("hidden"); el.textContent = ""; setActButton(); return; }
+  el.classList.remove("hidden");
+  // built off the page, and put in only if it reads differently -- the page does not reflow on every poll
+  const line = document.createElement("div");
+  const head = document.createElement("span");
+  head.textContent = r.running ? "The round is being written… " : (r.open ? "Round open: " : "Together here: ");
+  line.appendChild(head);
+  r.members.forEach((m, i) => {
+    const span = document.createElement("span");
+    span.textContent = (m.id === actingAs ? "you" : m.name) + (r.open ? (m.acted ? " ✓" : " …") : "");
+    if (m.acted) span.className = "acted";
+    line.appendChild(span);
+    if (i < r.members.length - 1) line.appendChild(document.createTextNode(" · "));
+  });
+  if (r.waiting_on && r.waiting_on.length) line.appendChild(document.createTextNode(" — waiting on " + r.waiting_on.join(", ") + " to agree"));
+  if (el.innerHTML !== line.innerHTML) el.innerHTML = line.innerHTML;
+  setActButton();
+}
+
+function roundOver() {
+  roundSubmitted = null; roundAgreed = false;
+  const input = document.getElementById("act-input");
+  if (roundTurn && input.value.trim() === (roundTurn.dataset.roundText || "")) input.value = "";
+  roundTurn = null;
+  setActButton();
+}
+
+// a result carrying narrations: shown in the turn the attempt opened
+async function showResult(result, turn) {
+  // the telling first, the world after (Marc, 2026-09-29: "you get the narration significantly before i do"):
+  // GET /world took ~2 s in Stonemarch, and the telling waited behind it; the refresh now follows it
+  const was = currentTurn;
+  if (turn) currentTurn = turn;
+  routeNarrations(result.narrations || {}, result.sara, result.sara_detail, result.witnessed);
+  currentTurn = was;
+  if (turn && (result.narrations || {})[actingAs]) {
+    // told: the turn before folds away now, and the reader is taken to the start of what they were told --
+    // one deliberate move (Safari keeps no place when content above the view is removed)
+    applyTurnCollapse();
+    turn.scrollIntoView({block: "start", behavior: "smooth"});
+  }
+  if (Object.keys(result.narrations || {}).length) {  // a declined jump changes nothing, the offers included
+    suggestedNextAction = result.suggested_next_action || "";
+    suggestedNextActionFromMemory = result.suggested_next_action_from_memory || "";
+    renderSuggestedAction();
+  }
+  refreshWorld().catch(() => { /* the telling is already shown; the next poll refreshes */ });
+}
+
+// one round poll at a time: with the faster poll two could overlap, and both see the same jump-ahead question
+let roundPolling = false;
+async function pollRound() {
+  if (roundPolling) return;
+  roundPolling = true;
+  try { await pollRoundOnce(); } finally { roundPolling = false; }
+}
+
+async function pollRoundOnce() {
+  if (!actingAs || pulseInFlight || roundAsking || document.getElementById("play-view").classList.contains("hidden")) return;
+  let r;
+  try { r = await api(`/rounds/${encodeURIComponent(actingAs)}`); } catch (e) { return; }
+  renderRoundStatus(r);
+  if (r.declined_by) {
+    appendPlayerEntry("", `${r.declined_by} did not go on: nothing happened. Act again.`, "system");
+    roundOver();
+  }
+  if (r.told) {
+    const defaulted = r.told.round && r.told.round.defaulted;
+    let turn = roundTurn;
+    if (defaulted && !turn) {
+      // the round went on without their action: what was taken for them -- their first suggestion -- heads the turn
+      startTurn();
+      appendPlayerEntry(labelFor(actingAs) + " — the round went on; your first suggestion, taken for you", defaulted, "system");
+      turn = currentTurn;
+      endTurn();
+    }
+    await showResult(r.told, turn);
+    roundOver();
+    return;
+  }
+  if (r.confirm && !roundAgreed) {
+    roundAsking = true;
+    const was = currentTurn;
+    currentTurn = roundTurn;
+    const proceed = jumpAgreed(r.confirm) ? true : await askYesNo(r.confirm.prompt);
+    currentTurn = was;
+    roundAsking = false;
+    const acting = actingAs;
+    pulseInFlight = true;
+    try {
+      const result = await sendWithRetry("/pulses/confirm", "POST", { entity_id: acting, proceed });
+      if (!proceed) roundOver();
+      else if (Object.keys(result.narrations || {}).length) { await showResult(result, roundTurn); roundOver(); }
+      else roundAgreed = true;
+      if (result.round) renderRoundStatus(result.round);
+    } catch (e) {
+      appendPlayerEntry("error", e.message, "error");
+    } finally { pulseInFlight = false; setActButton(); }
+  }
+}
+
+// Enter acts, as the one-line box did; Shift+Enter breaks the line
+document.getElementById("act-input").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+    ev.preventDefault();
+    document.getElementById("act-form").requestSubmit();
+  }
+});
+
+document.getElementById("act-input").addEventListener("input", async () => {
+  const input = document.getElementById("act-input");
+  if (roundSubmitted !== null && input.value.trim() !== roundSubmitted) {
+    // editing takes the action back out of the round until it is acted again
+    roundSubmitted = null;
+    if (roundTurn) { roundTurn.remove(); turnElements.splice(turnElements.indexOf(roundTurn), 1); roundTurn = null; }
+    try { renderRoundStatus(await api(`/rounds/${encodeURIComponent(actingAs)}/edit`, "POST")); } catch (e) { /* the next poll says */ }
+  }
+  if (roundSubmitted === null && input.value.trim()) reportTyping();
+  setActButton();
+});
+
+document.getElementById("act-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const text = document.getElementById("act-input").value.trim();
+  if (!text || (roundSubmitted !== null && text === roundSubmitted)) return;  // already in the round: Go closes it
+  runAction(false);
+});
+
+document.getElementById("go-btn").addEventListener("click", () => {
+  if (!document.getElementById("go-btn").disabled) runAction(true);
+});
+
+async function runAction(go) {
+  const input = document.getElementById("act-input");
+  const text = input.value.trim();
+  const btn = document.getElementById("act-btn");
+  const goBtn = document.getElementById("go-btn");
+  const suggestedBtn = document.getElementById("suggested-action-btn");
+  const suggestedMemoryBtn = document.getElementById("suggested-action-memory-btn");
+  if (!go) {
+    startTurn();
+    appendPlayerEntry(labelFor(actingAs) + " attempts", text, "system");
+  }
+  const turn = go ? roundTurn : currentTurn;
+  input.disabled = true; btn.disabled = true; goBtn.disabled = true; btn.textContent = "..."; suggestedBtn.disabled = true; suggestedMemoryBtn.disabled = true;
+  pulseInFlight = true;
+  let sending = null;
+  try {
+    const acting = actingAs;
+    if (!go) sending = { text, entity: acting, id: sendIdFor(text, acting) };
+    let result = go ? await sendWithRetry(`/rounds/${encodeURIComponent(acting)}/go`, "POST")
+                    : await sendWithRetry("/pulses", "POST", { action_text: text, entity_id: acting, client_id: sending.id });
+    failedSend = null;   // the server answered: it ran, once
+    while (result.confirm) {
+      const was = currentTurn;
+      currentTurn = turn;
+      const proceed = jumpAgreed(result.confirm) ? true : await askYesNo(result.confirm.prompt);
+      currentTurn = was;
+      result = await sendWithRetry("/pulses/confirm", "POST", { entity_id: acting, proceed });
+      if (!proceed) { roundOver(); break; }
+      if (result.round && !Object.keys(result.narrations || {}).length) roundAgreed = true;
+    }
+    if (result.round && !Object.keys(result.narrations || {}).length && !result.round.declined_by) {
+      // in the round, and it is still open: the action stays in the box, and Go closes it
+      // a Go answered with the round as it stands (it had gone on without it) leaves the page's own round as it was
+      if (!roundAgreed && !go) { roundSubmitted = text; roundTurn = turn; if (turn) turn.dataset.roundText = text; }
+      renderRoundStatus(result.round);
+    } else {
+      input.value = "";
+      await showResult(result, turn);
+      roundOver();
+    }
+  } catch (e) {
+    if (sending) failedSend = sending;   // it may have run: the same text, pressed again, is the same action
+    appendPlayerEntry("error", e.message, "error");
+  } finally {
+    pulseInFlight = false;
+    input.disabled = false; suggestedBtn.disabled = false; suggestedMemoryBtn.disabled = false;
+    // not on a touch screen: focusing opens the keyboard and moves the page under the reader
+    if (!window.matchMedia("(pointer: coarse)").matches) input.focus();
+    if (!go) endTurn();
+    setActButton();
+    startWitnessedPoll();
+    pollRound();  // the round as it now stands
+  }
+}
+
+// A suggestion fills the box and is never acted by itself (Marc, 2026-10-01): the player
+// may change it, and Act sends it. Filled, it is an edit like any typing -- the input
+// event takes an action already in a round back out until it is acted again.
+function fillAction(text) {
+  const input = document.getElementById("act-input");
+  input.value = text;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+  input.setSelectionRange(text.length, text.length);
+}
+
+document.getElementById("suggested-action-btn").addEventListener("click", () => {
+  if (suggestedNextAction) fillAction(suggestedNextAction);
+});
+
+document.getElementById("suggested-action-memory-btn").addEventListener("click", () => {
+  if (suggestedNextActionFromMemory) fillAction(suggestedNextActionFromMemory);
+});
+
+// -- World picker: which registered database (smritilila.worlds_registry) this
+// server currently has active. Hidden entirely when GET /worlds reports
+// none configured, so a server with no worlds.json behaves exactly like
+// it always did -- this is additive, not a required step.
+
+// The new player's page (Marc, 2026-10-06): shown once to a guest, per browser, and reopened by "how to play".
+let isOwner = false;
+function introSeen() { try { return localStorage.getItem("smritilila.introSeen") === "1"; } catch (e) { return false; } }
+function showIntro(show) {
+  const panel = document.getElementById("intro-panel");
+  panel.classList.toggle("hidden", !show);
+  const line = document.getElementById("world-description").textContent;
+  const w = document.getElementById("intro-world");
+  w.textContent = line; w.classList.toggle("hidden", !line);
+  if (!show) { try { localStorage.setItem("smritilila.introSeen", "1"); } catch (e) { /* storage may be unavailable */ } }
+}
+document.getElementById("admin-link").addEventListener("click", () => { location.href = "/admin"; });
+document.getElementById("intro-ok").addEventListener("click", () => showIntro(false));
+document.getElementById("intro-link").addEventListener("click", (ev) => { ev.preventDefault(); showIntro(document.getElementById("intro-panel").classList.contains("hidden")); });
+
+async function refreshWorldPicker() {
+  // The row also holds "new character" (init shows it when a world
+  // exists); only the selector and its label depend on a registry.
+  const row = document.getElementById("world-picker-row");
+  const pickerParts = [document.getElementById("world-select"), document.getElementById("world-select-label"), document.getElementById("world-description")];
+  // a guest does not make worlds (Marc, 2026-10-05): the corner button is the owner's, or a builder's; who this is, the server says
+  let me = { owner: false };
+  try { me = await api("/me"); } catch (e) { /* not known: treated as a guest */ }
+  document.getElementById("new-world-corner").classList.toggle("hidden", !(me.owner || me.builder));  // the owner, and a registered user enabled for the builder (2026-10-06)
+  document.getElementById("admin-link").classList.toggle("hidden", !me.owner);
+  isOwner = !!me.owner;
+  let worlds;
+  try {
+    worlds = await api("/worlds");
+  } catch (e) {
+    worlds = [];
+  }
+  if (!worlds.length) {
+    pickerParts.forEach(el => el.classList.add("hidden"));
+    return;
+  }
+  pickerParts.forEach(el => el.classList.remove("hidden"));
+  // a guest is offered the pull-down too (Marc, 2026-10-15; it was withheld from 2026-10-02): /worlds lists only the worlds open to them,
+  // and choosing one goes to its own address
+  row.classList.remove("hidden");
+  const select = document.getElementById("world-select");
+  select.innerHTML = "";
+  for (const w of worlds) {
+    const opt = document.createElement("option");
+    opt.value = w.name;
+    opt.textContent = w.name;
+    if (w.description) opt.title = w.description;  // each world's line, on hover
+    if (w.active) opt.selected = true;
+    select.appendChild(opt);
+  }
+  // the active world's one line, drawn from its root: what a visitor is entering (Marc, 2026-09-30)
+  const active = worlds.find(w => w.active);
+  const line = document.getElementById("world-description");
+  line.textContent = (active && active.description) || "";
+  line.classList.toggle("hidden", !line.textContent);
+}
+
+// Where a world is reached from this page: its own public address; else, for a world on a server of its own, its port on the host this page
+// came from -- when that host is this machine or a numbered address on the same network (a public hostname has no such port).
+function worldAddress(w) {
+  if (w.url) return w.url;
+  const h = location.hostname;
+  if (w.port && (h === "localhost" || h === "[::1]" || /^\d{1,3}(\.\d{1,3}){3}$/.test(h))) return `${location.protocol}//${h}:${w.port}/`;
+  return null;
+}
+
+document.getElementById("world-select").addEventListener("change", async (ev) => {
+  const name = ev.target.value;
+  // Pinned servers (Marc, 2026-10-01): a world with its own address is gone TO, never switched to -- choosing it
+  // moves only this browser, never what anyone else is playing in
+  const chosen = (await api("/worlds").catch(() => [])).find(w => w.name === name);
+  if (chosen && !chosen.active) {
+    const address = worldAddress(chosen);
+    if (address) {
+      location.href = address;
+      return;
+    }
+    if (chosen.port) {
+      // a world with a server of its own and no public address (a new one is local until given one; Marc, 2026-10-06): this server keeps
+      // its own world and would refuse, so say where it is rather than asking it
+      alert(`${name} has no public address yet. It runs on port ${chosen.port} of the machine the server is on: open http://127.0.0.1:${chosen.port} there.`);
+      await refreshWorldPicker();
+      return;
+    }
+  }
+  try {
+    await api("/worlds/select", "POST", { name });
+    // A full reload rather than re-rendering in place -- the newly
+    // active world has its own entirely separate canon/characters, and
+    // init() below already knows how to render a fresh load correctly
+    // (continue-picker vs. start screen) for whatever world is active.
+    location.reload();
+  } catch (e) {
+    alert(e.message);
+    await refreshWorldPicker(); // revert the <select> to the actually-active world
+  }
+});
+
+(async function init() {
+  await refreshWorldPicker();
+
+  // GET /world/exists is deliberately side-effect-free (see its own
+  // docstring) -- safe to call unconditionally on every load, unlike
+  // GET /world, which would begin an empty world for a
+  // genuinely first-time visitor. This replaces the old localStorage
+  // flag entirely: that only remembered a world existed in the ONE
+  // browser profile that started it, so a server restart, a different
+  // browser, or a cleared profile all left a real, still-existing world
+  // with no way to discover or resume it from here.
+  let info;
+  try {
+    info = await api("/world/exists");
+  } catch (e) {
+    return; // API unreachable
+  }
+  if (!info.exists) {
+    // nothing here to continue or join: making a world is the only move
+    document.getElementById("new-world-corner").click();
+    return;
+  }
+  worldExists = true;
+  if (!isOwner && !introSeen()) showIntro(true);
+  document.getElementById("world-picker-row").classList.remove("hidden");
+  document.getElementById("new-character-btn").classList.remove("hidden");
+
+  const container = document.getElementById("continue-characters");
+  container.innerHTML = "";
+  if (!Object.keys(info.playable_entities).length) {
+    // a world built from a brief, before anyone has arrived
+    document.getElementById("continue-intro").textContent = "No one has arrived in this world yet. Make a new character to be the first.";
+  }
+  for (const [entityId, labels] of Object.entries(info.playable_entities)) {
+    const btn = document.createElement("button");
+    btn.textContent = (labels && labels[0]) ? labels[0] : entityId;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        actingAs = entityId; // set before refreshWorld() so renderCharacterSwitcher keeps this choice, not scene_owner_entity_id
+        await refreshWorld();
+        showPlayView();
+        await showRecap(entityId);
+      } catch (e) {
+        alert(e.message);
+        btn.disabled = false;
+      }
+    });
+    container.appendChild(btn);
+  }
+  document.getElementById("continue-view").classList.add("open");
+})();
+</script>
+</body>
+</html>
