@@ -9,7 +9,7 @@ and a narrator model writes what happens next from what each of them remembers. 
 everything a world *is* (its weather, its roads, its manners) is text written once at its birth and then by play.
 
 **Start with `Smritilila in Brief.md`**: what a world is, how it works, and how to play one, on a page or two. Two tales of played worlds, written from the memories of the characters in
-them, are in `stories/`.
+them, are in `stories/`. They, and more tales like them, can be read as pages in the [Smṛtilīlā Chronicles](https://world-builder-stories.netlify.app/).
 
 Smritilila is licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE.md`). Rough edges are expected.
 
