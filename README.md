@@ -72,8 +72,7 @@ python scripts/serve.py run     # http://127.0.0.1:8198
 
 Open <http://127.0.0.1:8198>, pick a character (Teo, the ferryman's apprentice, is in the example world), and write what he does.
 
-The engine is run from a clone of this repository, as above: its pages, its schema and its scripts sit beside the package, not inside it. The name `smritilila` on PyPI is a placeholder
-that holds the name, so `pip install smritilila` does not install the engine.
+The engine is run from a clone of this repository, as above: its pages, its schema and its scripts sit beside the package, not inside it.
 
 On **Windows**, in PowerShell: `py -3.12 -m venv .venv`, then `.venv\Scripts\Activate.ps1`, and `copy .env.example .env`; the rest is the same. To set a variable for one session
 rather than in `.env`: `$env:TEST_DATABASE_URL = "..."`, where the commands here say `export`. The first start downloads the embedding model, so allow it a few minutes.
