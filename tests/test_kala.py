@@ -470,6 +470,57 @@ def test_a_world_turn_stops_at_an_offline_players_present_unless_the_world_may_a
     assert pravrtti._kala_gate(world, ["aunt"])[0] == ["aunt"]
 
 
+def _far_world(age_ahead: int):
+    """A clocked world, tick 80 (a far tick), the age overdue and `age_ahead` minutes past the player's present; a monk in the abbey,
+    far from the hall where the player stands and online."""
+    import time as _time
+    from smritilila.smrti.genesis import ITIHASA
+    canon = Maya(world_time=80, entities={
+        "keep": Entity("keep", ["the keep"], 0, "genesis", avarana="scene"),
+        "hall": Entity("hall", ["the hall"], 0, "genesis", avarana="scene", kosha="keep"),
+        "cloister": Entity("cloister", ["the cloister"], 0, "genesis", avarana="scene"),
+        "abbey": Entity("abbey", ["the abbey"], 0, "genesis", avarana="scene", kosha="cloister"),
+        "wen": Entity("wen", ["Wentworth"], 0, "genesis"),
+        "monk": Entity("monk", ["the monk"], 0, "genesis"),
+        "age": Entity("age", ["the world at large"], 0, ITIHASA)})
+    world = adhisthana.WorldSession(canon=canon, scene_owner_entity_id="wen", entry_point_location_ids=["hall"], playable_entity_ids=["wen"])
+    world.world_data = {"clock": CLOCK, "pacing": {"arrivals_on_traffic": False}}
+    world.bhuvana = "THE YEAR. 1928."
+    present = ONE + 2 * H
+    world.records = [Record("k1", "kosha", "wen", "hall", 0, "p0", None), Record("k2", "kosha", "monk", "abbey", 0, "p0", None),
+                     Record("t1", "time", "age", str(present + age_ahead), 0, "p0", f"{ONE}||")]  # the age has reached `age_ahead` past the player
+    world.recent_memories = [_m(0, "age", "nowhere", 0, None, None), _m(1, "monk", "abbey", 10, ONE, ONE + H), _m(2, "wen", "hall", 70, ONE, present)]
+    world.last_seen["wen"] = _time.monotonic()
+    return world
+
+
+def test_an_age_the_gate_would_hold_does_not_take_the_far_tick_from_the_far_world() -> None:
+    """Stonemarch, 2026-10-27: the priests of the Temple had no turn in 400 ticks. A far being is drawn only on a far tick, and on every far tick
+    the overdue age took the draw ahead of them -- alone -- and the gate (NPCs follow and never lead) held it, the age being a season ahead of the
+    players: nobody was drawn, and an age never drawn is overdue again at the next far tick (444 of 462 far ticks in Stonemarch's log, since tick 72).
+    The pool asks the gate's own question before it gives the age the tick."""
+    from smritilila.smrti.kala import AGE_LEAD
+    world = _far_world(AGE_LEAD + H)
+    assert pravrtti._age_held(world) is True
+    pool = pravrtti._smrti_exploration_pool(world)
+    assert pool != ["age"] and "monk" in pool                          # the far being has its tick
+    drawn, turns = pravrtti._kala_gate(world, pool)
+    assert "monk" in drawn and "monk" in turns and "age" not in drawn   # the gate lets it run (the far scenes are asked too, as ever); the held age waits, as before
+    world.canon.world_time = 82                                          # not a far tick: far beings wait for theirs, held age or none
+    assert "monk" not in pravrtti._smrti_exploration_pool(world)
+
+
+def test_an_age_the_gate_would_let_run_still_takes_the_far_tick_first() -> None:
+    """The age is not ahead of the players by a season: it takes the draw ahead of the far actors, alone, as v5 §38's age moves."""
+    from smritilila.smrti.kala import AGE_LEAD
+    world = _far_world(AGE_LEAD - H)
+    assert pravrtti._age_held(world) is False
+    assert pravrtti._smrti_exploration_pool(world) == ["age"]
+    assert pravrtti._kala_gate(world, ["age"])[0] == ["age"]
+    world.world_data = {}                                                # a world keeping no clock has nothing to hold: the age is never held
+    assert pravrtti._age_held(world) is False
+
+
 def test_a_rounds_key_is_the_scene_and_what_a_boundary_joins_to_it() -> None:
     """Marc, 2026-09-28: "Dunstan and I are still locked in rounds. Shouldn't we be going separately now?" -- keyed
     by the container directly above (v4.31), the church and the smithy of Millhaven shared a round. A round is its
@@ -861,13 +912,9 @@ def test_a_worlds_turn_is_shown_what_players_lived_next_door(monkeypatch) -> Non
     assert r.pending is None and {m.ended for m in r.memories_written} == {ONE + 5 * H}  # its whole span, not the 90 it said
 
 
-def _window_world(monkeypatch, mover: str | None, before: tuple = ()):
-    """Teo waits at the landing 5:00-5:45. The vale and the road, next to
-    it, take their turns in the window (the landing, his own, does not):
-    quiet, or on the road someone moves at 5:20 -- a traveller, or Teo's
-    own passenger (the held pulse bound him: his doing, not an event)."""
-    import asyncio
-    from smritilila import main
+def _landing_world(before: tuple = ()):
+    """Teo waits at the landing 5:00-5:45: a long jump held for his consent. The vale and the road are next door; in this flow they take no
+    turn, they only RECORD -- `before` is what they recorded earlier, told before Teo's pulse."""
     from smritilila.smrti.pulse import SmrtiPulseResult
     canon = Maya(world_time=9, entities={
         "landing": Entity("landing", ["the landing"], 0, "genesis", avarana="scene"),
@@ -880,7 +927,7 @@ def _window_world(monkeypatch, mover: str | None, before: tuple = ()):
     world.records = [Record("k1", "kosha", "teo", "landing", 0, "p0", None), Record("k2", "kosha", "landing", "vale", 0, "p0", None),
                      Record("k3", "kosha", "road", "vale", 0, "p0", None)]
     world.recent_memories = [_m(1, "teo", "landing", 8, five - 10, five)]
-    for mem, rec in before:  # what next door already recorded, told before Teo's pulse
+    for mem, rec in before:
         world.recent_memories.append(mem)
         world.records += [rec] if rec else []
     held_mem = _m(9, "teo", "landing", 10, five, five + 45)
@@ -890,28 +937,30 @@ def _window_world(monkeypatch, mover: str | None, before: tuple = ()):
                          "working_canon": copy_canon(canon, 10), "pulse_id": "p10", "scene": "landing", "tick": 9,
                          "kind": "long", "minutes": 45, "from": five, "to": five + 45, "origin": "landing", "dest": "landing",
                          "prompt": "..."}
-    turns, commits, reruns, shown_ = [], [], [], []
+    return world, five
 
-    async def turn(world_, roles, sid, n, *, begin=None, cap=None, shown=None, theirs=frozenset()):
-        turns.append((sid, begin, cap))
-        shown_.extend(shown or [])
-        assert theirs == frozenset({"teo", "passenger", "road"})  # the actor's: never voiced or moved
-        t = world_.canon.world_time + 1
-        world_.canon.world_time = t
-        moving = mover if sid == "road" else None
-        text = ("Teo sat on the post by the landing." if moving == "named" else f"{moving} came down the road." if moving
-                else f"{sid} lay quiet.")
-        world_.recent_memories.append(Memory(f"w{t}", sid, frozenset(), text, "AMBIENT", 5, sid, t, f"w{t}", None, None, five, five + 20))
-        if moving and moving != "named":
-            world_.records.append(Record(f"wk{t}", "kosha", moving, sid, t, f"w{t}", None))
+
+def _teo_says_yes(monkeypatch, world, roll="real"):
+    """Teo agrees. What would cost a model call is a stub that keeps what it was given: a scene's turn (which must never run now), the
+    commit, the telling told again. `roll`: the die -- None (nothing interrupts), (minute, scene), or "real" (as it is)."""
+    import asyncio
+    turns, commits, reruns, rolls = [], [], [], []
+
+    async def turn(*a, **k):
+        turns.append((a, k))
 
     async def commit(world_, working, result_, actor, pid):
         commits.append((working.world_time, [m.world_time for m in result_.memories_written]))
 
-    async def rerun(req, world_, actor, roles, bt, start, confirmed=False, wait_until=None, window=None, setting=None):
-        reruns.append(window if setting is None else (window, setting))
+    async def rerun(req, world_, actor, roles, bt, start, confirmed=False, wait_until=None, window=None, setting=None, interrupt=None):
+        reruns.append({"window": window, "setting": setting, "interrupt": interrupt})
         return schemas.PulseResponse(narrations={}, promoted_entity_ids=[],
                                   suggested_next_action="", suggested_next_action_from_memory="")
+    if roll != "real":
+        def die(world_, held_, actor_):
+            rolls.append(held_["from"])
+            return roll
+        monkeypatch.setattr(spanda, "_interruption", die)
     monkeypatch.setattr(spanda, "_run_smrti_activation_in_background", turn)
     monkeypatch.setattr(spanda, "_commit_smrti_result", commit)
     monkeypatch.setattr(spanda, "_submit_smrti_pulse", rerun)
@@ -921,7 +970,7 @@ def _window_world(monkeypatch, mover: str | None, before: tuple = ()):
     monkeypatch.setattr(adhisthana, "get_world", lambda: _async(world))
     monkeypatch.setattr(spanda, "log_discarded", lambda **k: None)
     asyncio.run(spanda.confirm_pulse(schemas.ConfirmRequest(entity_id="teo", proceed=True), BackgroundTasks()))
-    return five, turns, commits, reruns, shown_
+    return turns, commits, reruns, rolls
 
 
 def copy_canon(canon, t):
@@ -931,27 +980,158 @@ def copy_canon(canon, t):
     return c
 
 
-def test_a_quiet_window_lets_the_long_action_stand(monkeypatch) -> None:
-    five, turns, commits, reruns, shown = _window_world(monkeypatch, None)
-    assert turns == [("road", five, 45), ("vale", five, 45)]    # next door, the road he watches first; not his own landing
-    assert shown[:1] == ["IN THIS TURN'S TIME A PLAYER IS AT landing, from Saturday, 28 April 1928, 5:00 in the morning to "
-                         "Saturday, 28 April 1928, 5:45 in the morning: teo, with passenger. That place, the player and what is "
-                         "with them are not this turn's to tell: do not describe them at all -- not seen, not heard, not their "
-                         "tracks. Narrate only this scene, and what comes to it or goes from it."]   # never what he does
-    # v4.32: the quiet turns' rows are the world around in the same hours -- the telling is told again under
-    # the same sky (the Crossing: Teo's held night had rain, the turns frost), never stopped by them
-    assert commits == [] and reruns == [(None, [("road", "road lay quiet."), ("vale", "vale lay quiet.")])]
+def test_a_long_jump_agreed_to_with_nothing_in_its_way_is_committed_as_it_was_told(monkeypatch) -> None:
+    """Marc, 2026-10-27: "It's the wrong flow." After a Yes the world took up to three turns next door, one after another, and the telling was
+    thrown away and told again: a median 30 s after Yes over 173 jumps, 67% of them with nothing found. Now one die is rolled, and if nothing
+    interrupts, the telling the player was asked about is the one committed: no scene takes a turn, no model call is made."""
+    world, five = _landing_world()
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=None)
+    assert rolls == [five] and turns == [] and reruns == []
+    assert commits == [(10, [10])]                                    # the held telling, committed at the tick it lands at
 
 
-def test_something_in_the_window_interrupts_the_long_action(monkeypatch) -> None:
-    five, turns, commits, reruns, shown = _window_world(monkeypatch, "traveller")
-    assert commits == [] and reruns == [([(five + 20, "road", "traveller came down the road.")], [("vale", "vale lay quiet.")])]
-    assert turns == [("road", five, 45), ("vale", five, 20)]    # after the first event, the rest end there
+def test_an_interrupted_long_jump_is_told_again_once_with_the_interruption(monkeypatch) -> None:
+    world, five = _landing_world()
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=(five + 20, "landing"))
+    assert turns == [] and commits == []                              # no scene's turn; the held telling is not the one lived
+    assert reruns == [{"window": None, "setting": None, "interrupt": (five + 20, "landing")}]   # one telling, told where it stops
 
 
-def test_the_actors_own_doing_in_the_window_is_not_an_interruption(monkeypatch) -> None:
-    five, turns, commits, reruns, shown = _window_world(monkeypatch, "passenger")
-    assert reruns == [(None, [("road", "passenger came down the road."), ("vale", "vale lay quiet.")])]  # not an event: the setting
+def test_what_next_door_already_recorded_is_an_event_and_no_die_is_rolled(monkeypatch) -> None:
+    """Stonemarch, 2026-10-01: a dragon came down on the green at 11:40, told before Filonius sat down next door at 11:41 to wait three hours;
+    nothing showed it to him. A neighbour's recorded row whose pulse moved someone not the actor's is an event, and the jump ends there --
+    found with no model call, so a jump still stops at what was already written, and a real event needs no die."""
+    five = ONE + 4 * H
+    landed = Memory("g7", "vale", frozenset(), "A winged beast came down on the vale; horns sounded.", "AMBIENT", 5, "vale", 7, "p7",
+                    None, None, five - 1, five + 5)
+    world, _five = _landing_world(before=[(landed, Record("gk7", "kosha", "beast", "vale", 7, "p7", None))])
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=None)
+    assert turns == [] and commits == [] and rolls == []
+    assert reruns == [{"window": [(five, "vale", "A winged beast came down on the vale; horns sounded.")], "setting": None, "interrupt": None}]
+
+
+def test_what_next_door_recorded_quietly_neither_stops_nor_retells_the_long_jump(monkeypatch) -> None:
+    """The counter-case: recorded rows with no move, mark or line by anyone are the world around, never a stop (listed as events they cut 4 of
+    8 replayed waits short) -- and, now that no turn is run for them, never a reason to tell the jump again: the die is rolled and the held
+    telling stands."""
+    five = ONE + 4 * H
+    quiet = Memory("g7", "vale", frozenset(), "Carts went by on the vale road.", "AMBIENT", 5, "vale", 7, "p7",
+                   None, None, five + 5, five + 30)
+    world, _five = _landing_world(before=[(quiet, None)])
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=None)
+    assert turns == [] and reruns == [] and rolls == [five] and commits == [(10, [10])]
+
+
+def test_a_row_recorded_next_door_that_names_the_actor_is_an_event(monkeypatch) -> None:
+    """Told not to, a neighbour's row says Teo sat on the post: by his name, the engine's own string. It stands as an event, so his pulse is
+    told again and holds it (the check a fresh turn's row had too)."""
+    five = ONE + 4 * H
+    named = Memory("g8", "road", frozenset(), "Teo sat on the post by the landing.", "AMBIENT", 5, "road", 8, "p8", None, None, five + 15, five + 20)
+    world, _five = _landing_world(before=[(named, None)])
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=None)
+    assert turns == [] and commits == [] and rolls == []
+    assert reruns == [{"window": [(five + 15, "road", "Teo sat on the post by the landing.")], "setting": None, "interrupt": None}]
+
+
+def test_an_interrupted_jump_is_told_under_the_same_sky_as_the_quiet_rows_next_door(monkeypatch) -> None:
+    """v4.32 (the Crossing: the held night had rain and a flood, next door frost): when the jump is told again anyway, what next door recorded
+    quietly in the same hours is shown with the interruption, as it was with an event."""
+    five = ONE + 4 * H
+    quiet = Memory("g7", "vale", frozenset(), "Carts went by on the vale road.", "AMBIENT", 5, "vale", 7, "p7",
+                   None, None, five + 5, five + 30)
+    world, _five = _landing_world(before=[(quiet, None)])
+    turns, commits, reruns, rolls = _teo_says_yes(monkeypatch, world, roll=(five + 30, "landing"))
+    assert reruns == [{"window": None, "setting": [("vale", "Carts went by on the vale road.")], "interrupt": (five + 30, "landing")}]
+
+
+def test_the_chance_of_an_interruption_grows_with_the_length_of_the_jump() -> None:
+    """Marc, 2026-10-27: a probability of an interrupting event as a function of the jump's length; 96 hours the mean time between them."""
+    from smritilila.smrti.kala import INTERRUPTION_HOURS, interruption_chance
+    assert INTERRUPTION_HOURS == 96
+    assert interruption_chance(0, 96) == 0 and interruption_chance(60, None) == 0 and interruption_chance(60, 0) == 0
+    odds = {m: round(interruption_chance(m, 96), 3) for m in (30, 60, 120, 480, 24 * 60, 48 * 60, 7 * 24 * 60, 14 * 24 * 60)}
+    assert odds == {30: 0.005, 60: 0.01, 120: 0.021, 480: 0.08, 1440: 0.221, 2880: 0.393, 10080: 0.826, 20160: 0.97}
+    chances = [interruption_chance(m, 96) for m in (10, 100, 1000, 10000)]
+    assert chances == sorted(chances) and chances[-1] < 1.0 + 1e-12
+
+
+def test_a_worlds_own_scale_sets_the_chance_and_the_pace_holds_the_default() -> None:
+    world, _five = _landing_world()
+    assert world.pace()["interruption_hours"] == 96
+    world.world_data["pacing"] = {"interruption_hours": 12}
+    assert world.pace()["interruption_hours"] == 12
+
+
+def test_the_die_is_the_pulses_own_and_a_retry_meets_the_same_one() -> None:
+    """Like the fortune (Marc, 2026-09-27, Jakal declining a closed scene three times): whose roll and when, never the attempt. Declining and
+    asking again at the same moment meets the same die, and a longer jump is interrupted whenever a shorter one was."""
+    world, five = _landing_world()
+    held = world.held["teo"]
+    world.world_data["pacing"] = {"interruption_hours": 0.001}          # a chance of 1 for any jump: the die is the minute
+    a = spanda._interruption(world, held, "teo")
+    assert a is not None and a == spanda._interruption(world, held, "teo")
+    minute, scene = a
+    assert five < minute < five + 45 and scene == "landing"
+    world.world_data["pacing"] = {"interruption_hours": 0}
+    assert spanda._interruption(world, held, "teo") is None                # a world that sets none is never interrupted
+    world.world_data["pacing"] = {"interruption_hours": 2}
+    for tick in range(1, 120):
+        w = copy_canon(world.canon, tick)
+        short, long_ = dict(held, working_canon=w, to=five + 30), dict(held, working_canon=w, to=five + 600)
+        if spanda._interruption(world, short, "teo") is not None:
+            assert spanda._interruption(world, long_, "teo") is not None
+
+
+def test_a_closed_scene_is_never_interrupted() -> None:
+    """The pacing's `arrivals` (v5 §15): a closed valley is closed -- nothing comes in, so nothing interrupts. Sure to be interrupted otherwise."""
+    import json
+    world, five = _landing_world()
+    world.world_data["pacing"] = {"interruption_hours": 0.001}
+    held = world.held["teo"]
+    assert spanda._interruption(world, held, "teo") is not None
+    world.records.append(Record("pz", "prakriti", "landing", json.dumps({"arrivals": False}), 0, "p0", "pacing"))
+    world._samskara = None
+    assert spanda._interruption(world, held, "teo") is None
+
+
+def test_the_die_over_many_jumps_follows_the_chance_and_the_minute_is_uniform_over_the_span() -> None:
+    world, five = _landing_world()
+    held = world.held["teo"]
+    day = dict(held, to=five + 24 * 60)
+    hits, where = 0, []
+    for tick in range(1, 2001):
+        r = spanda._interruption(world, dict(day, working_canon=copy_canon(world.canon, tick)), "teo")
+        if r is not None:
+            hits += 1
+            where.append((r[0] - five) / (24 * 60))
+    assert 0.18 < hits / 2000 < 0.26                                      # 22.1% for a day at a mean of 96 hours
+    assert 0.45 < sum(where) / len(where) < 0.55 and 0 < min(where) and max(where) < 1
+    assert sum(1 for w in where if w < 0.5) / len(where) > 0.4 and sum(1 for w in where if w >= 0.5) / len(where) > 0.4
+
+
+def test_the_interruption_is_shown_to_the_telling_which_stops_there(monkeypatch) -> None:
+    """The interruption rides the window's own path: the action is lived only up to the minute, the Narrator says what comes, and the
+    pulse ends there (`elapsed_minutes` 20). The engine says only that something does: it knows no kind (s0)."""
+    from smritilila.smrti.pulse import run_smrti_pulse
+    canon = Maya(world_time=6, entities={
+        "yard": Entity("yard", ["the yard"], 0, "genesis", avarana="scene"),
+        "wen": Entity("wen", ["Wentworth"], 0, "genesis")})
+    seen = []
+
+    class C:
+        def complete_with_tool(self, system, user, **kw):
+            seen.append(user)
+            return {"narration": "A rider comes into the yard; you stand.", "elapsed_minutes": 20,
+                    "perceiver_tuples": [{"perceiver": "wen", "text": "A rider came into the yard and I stood.", "salience": "ordinary"}],
+                    "scene_tuples": [], "suggested_next_action": ""}
+    monkeypatch.setattr("smritilila.smrti.pulse.log_event", lambda *a, **k: None)
+    r = run_smrti_pulse(canon, "wen", "I wait for the bell", 6, "p6", [_m(1, "wen", "yard", 3, None, None)], C(), None,
+                        records=[Record("r1", "kosha", "wen", "yard", 0, "p0", None)], view={"world_data": {"clock": CLOCK}},
+                        players=frozenset({"wen"}), playable=frozenset({"wen"}), confirmed=True,
+                        interrupt=(ONE + 20, "yard"))
+    assert len(seen) == 1 and "SOMETHING INTERRUPTS THIS ACTION at Saturday, 28 April 1928, 1:20 at night, in yard" in seen[0]
+    assert "THESE HAPPEN" not in seen[0]                                   # not a recorded event: the Narrator's to say
+    assert r.pending is None and {m.ended for m in r.memories_written} == {ONE + 20}
 
 
 def test_the_rerun_is_shown_the_window_and_stops_there(monkeypatch) -> None:
@@ -1001,39 +1181,6 @@ def test_the_rerun_is_shown_the_world_around_and_it_never_stops_the_action(monke
     assert len(seen) == 1 and "THE WORLD AROUND, IN THIS ACTION'S TIME" in seen[0]
     assert "in the yard: The yard lay white with frost." in seen[0] and "THESE HAPPEN" not in seen[0]
     assert r.pending is None and {m.ended for m in r.memories_written} == {ONE + 45}
-
-
-def test_what_next_door_already_recorded_in_the_window_reaches_the_long_action(monkeypatch) -> None:
-    """Stonemarch, 2026-10-01: a dragon came down on the green at 11:40, told
-    before Filonius sat down next door at 11:41 to wait three hours; nothing
-    showed it to him. A neighbour's recorded row whose pulse moved someone not
-    the actor's is an event, and the window ends there -- no fresh turn runs."""
-    five = ONE + 4 * H
-    landed = Memory("g7", "vale", frozenset(), "A winged beast came down on the vale; horns sounded.", "AMBIENT", 5, "vale", 7, "p7",
-                    None, None, five - 1, five + 5)
-    out = _window_world(monkeypatch, None, before=[(landed, Record("gk7", "kosha", "beast", "vale", 7, "p7", None))])
-    _five, turns, commits, reruns, shown = out
-    assert commits == [] and turns == []
-    assert reruns == [[(five, "vale", "A winged beast came down on the vale; horns sounded.")]]  # no world around: the window alone
-
-
-def test_what_next_door_recorded_quietly_is_the_world_around_never_a_stop(monkeypatch) -> None:
-    """The counter-case: recorded rows with no move, mark or line by anyone
-    are the world around, as a quiet fresh turn's are; listed as events
-    instead, they cut 4 of 8 replayed waits short."""
-    five = ONE + 4 * H
-    quiet = Memory("g7", "vale", frozenset(), "Carts went by on the vale road.", "AMBIENT", 5, "vale", 7, "p7",
-                   None, None, five + 5, five + 30)
-    _five, turns, commits, reruns, shown = _window_world(monkeypatch, None, before=[(quiet, None)])
-    assert commits == [] and len(reruns) == 1 and reruns[0][0] is None
-    assert ("vale", "Carts went by on the vale road.") in reruns[0][1]
-
-
-def test_a_window_row_that_names_the_actor_counts_as_an_event(monkeypatch) -> None:
-    """Told not to, the road's row says Teo sat on the post: by his name, the
-    engine's own string. It stands, so his pulse runs again and holds it."""
-    five, turns, commits, reruns, shown = _window_world(monkeypatch, "named")
-    assert commits == [] and reruns == [([(five + 20, "road", "Teo sat on the post by the landing.")], [("vale", "vale lay quiet.")])]
 
 
 def test_an_idle_player_keeps_their_own_clock() -> None:

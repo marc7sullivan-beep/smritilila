@@ -754,7 +754,7 @@ def test_the_second_suggestions_thread_is_chosen_by_the_engine_a_person_not_retu
     mems.append(Memory("a4", "senator", frozenset({"sela"}), "I sat by the fire a long while and said nothing.", "PRIMARY", 1, "landing", 13, "p13", None))
     assert thread_from_memory(canon, mems, "senator", present={"wife"}, here="house") == "sela (Sela, a pedlar) -- [10, indelible] I asked Sela straight out whether she was my mother."
     mems.pop()
-    # the line reaches the Narrator, on a player's pulse only
+    # the line reaches the Narrator, on a player's pulse (and on a being's own turn: the next test)
     client = _FakeClient({"narration": "x", "perceiver_tuples": [{"perceiver": "senator", "text": "I sat a while longer by the fire.", "salience": "passing"}],
                           "scene_tuples": [{"scene": "house", "text": "The man sat on by the fire a while.", "present": ["senator", "wife"]}], "suggested_next_action": ""})
     monkeypatch.setattr("smritilila.smrti.pulse.log_event", lambda event, **f: None)
@@ -766,6 +766,54 @@ def test_the_second_suggestions_thread_is_chosen_by_the_engine_a_person_not_retu
     mems.append(Memory("a5", "senator", frozenset({"stall", "wife"}), "I asked my wife about the road, hard.", "PRIMARY", 1, "market", 9, "p9", None))
     assert thread_from_memory(canon, mems, "senator", present={"wife", "sela"}, here="house") == ""
     run_smrti_pulse(canon, "senator", None, 41, "p41", mems, client, None)
+    assert "THREAD FROM MEMORY: sela (Sela, a pedlar) -- [10, indelible]" in client.calls[1][1]  # the senator's own turn: the thread, which it was never shown before 2026-10-27
+    assert "stall" not in client.calls[1][1].split("THREAD FROM MEMORY:")[1].split("\n")[0]       # a person merely present in weighty tuples, never named, is still furniture
+
+
+def test_a_plan_named_only_in_words_is_a_thread_on_a_beings_own_turn(monkeypatch) -> None:
+    """Stonemarch, 2026-10-27: the Temple's two priests held plans against each other and did nothing outward in 34 turns. Their seed lists no one
+    (subject_ids []), their later tuples list only the priest and the medallion in his hand, and a being's own turn was shown THREAD FROM MEMORY:
+    (none) whatever it held. On a being's own turn the thread now also reads whom a weighty tuple names in its words (`named`); a player's second
+    suggestion is as it was."""
+    from smritilila.smrti.narrator import SYSTEM
+    from smritilila.smrti.pulse import THREAD_RECENT, run_smrti_pulse, thread_from_memory
+    assert "THREAD FROM MEMORY, when it names someone or somewhere" in SYSTEM
+    canon = Maya(world_time=60, entities={
+        "fane": Entity("fane", ["the fane of earth"], 0, "genesis", avarana="building"),
+        "cavern": Entity("cavern", ["the cavern pool"], 0, "genesis", avarana="building"),
+        "romag": Entity("romag", ["Romag, the earth priest"], 0, "genesis"),
+        "belsornig": Entity("belsornig", ["Belsornig, the water priest"], 0, "genesis"),
+        "davl": Entity("davl", ["Rannos Davl"], 0, "genesis"),          # named in a tuple, and has no stream of his own: never a thread
+        "medallion": Entity("medallion", ["a bronze medallion"], 0, "genesis"),
+    })
+
+    def m(i, who, t, text, sal, subjects=(), loc="fane"):
+        return Memory(f"m{i}", who, frozenset(subjects), text, "PRIMARY", sal, loc, t, f"p{t}", None)
+    mems = [m(1, "romag", 0, "I am Romag, curate of the Earth Temple. I crush bone upon the altar.", 1),
+            m(2, "romag", 0, "I deal with Rannos Davl in Millhaven for arms.", 3),
+            m(3, "romag", 0, "I know Belsornig buys captives, and I scheme to crush his water-spawn before the Great Temple awakens.", 2)]
+    for i in range(THREAD_RECENT + 3):
+        mems.append(m(10 + i, "romag", 10 + i, "I ground bone and paid the bugbear sentries.", 5, {"romag", "medallion"}))
+    mems.append(m(50, "belsornig", 1, "I tend the green braziers.", 5, {"belsornig"}, "cavern"))
+    # as it was: a tuple is about whom it lists; the plan lists no one, so there is no thread
+    assert thread_from_memory(canon, mems, "romag", set(), "fane") == ""
+    # asked for what the tuple names: the matter he has been leaving, with the plan's own words
+    t = thread_from_memory(canon, mems, "romag", set(), "fane", named=True)
+    assert t.startswith("belsornig (Belsornig, the water priest) -- [0, marking] I know Belsornig buys captives")
+    # present: not a thread; with the actor lately (listed in his recent tuples): not left; a name with no stream: never one
+    assert thread_from_memory(canon, mems, "romag", {"belsornig"}, "fane", named=True) == ""
+    lately = mems + [m(99, "romag", 55, "Belsornig came to the fane and we spoke.", 5, {"romag", "belsornig"})]
+    assert thread_from_memory(canon, lately, "romag", set(), "fane", named=True) == ""
+    # a place named in words is not a person: never a thread of this kind (the scene fallback is as it was)
+    mems.append(m(60, "romag", 20, "I swore at the cavern pool that it would fall.", 2))
+    assert thread_from_memory(canon, mems, "romag", set(), "fane", named=True).startswith("belsornig ")
+    # the line reaches the Narrator on the being's own turn, and on a player's pulse it is as it was
+    client = _FakeClient({"narration": "x", "perceiver_tuples": [{"perceiver": "romag", "text": "I ground the bone.", "salience": "passing"}],
+                          "scene_tuples": [{"scene": "fane", "text": "The priest ground bone.", "present": ["romag"]}], "suggested_next_action": ""})
+    monkeypatch.setattr("smritilila.smrti.pulse.log_event", lambda event, **f: None)
+    run_smrti_pulse(canon, "romag", None, 61, "p61", mems, client, None)
+    assert "THREAD FROM MEMORY: belsornig (Belsornig, the water priest) -- [0, marking]" in client.calls[0][1]
+    run_smrti_pulse(canon, "romag", "grinds the bone", 62, "p62", mems, client, None)
     assert "THREAD FROM MEMORY: (none)" in client.calls[1][1]
 
 

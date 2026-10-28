@@ -29,6 +29,24 @@ if TYPE_CHECKING:
     from smritilila.adhisthana import WorldSession
 
 
+def _age_ahead(world: WorldSession) -> int | None:
+    """How far the age's clock stands ahead of the players' latest present: the one question the kāla gate asks of the age (v5 §23), asked here
+    so the pool and the gate cannot differ about it. None where the gate would not ask: a world keeping no clock, or no player in it.
+    Cost: the players, one clock each."""
+    kala = world.samskara().kala
+    here = [p for p in world.playable_entity_ids if p not in world.absent()]
+    if kala is None or not here:
+        return None
+    return (_age_clock(world) or kala.start) - max(kala.now(p) for p in here)
+
+
+def _age_held(world: WorldSession) -> bool:
+    """The gate would hold the age this tick (smrti.age_waits): it stands more than `age_lead` ahead of the players, a season -- the age runs
+    ahead of them, never far."""
+    ahead = _age_ahead(world)
+    return ahead is not None and ahead > int(world.pace()["age_lead"])
+
+
 def _smrti_exploration_pool(world: WorldSession) -> list[str]:
     """v4 (v5 §10-§12, §38): every perceiver who is not a player whose time is their own, drawn by scene.
     Its name: pravṛtti (प्रवृत्ति), activity, the world's own unfolding (v5 §38).
@@ -85,12 +103,16 @@ def _smrti_exploration_pool(world: WorldSession) -> list[str]:
     far_tick = canon.world_time % pace["far_every"] in (0, 1)
     # The age moves (itihasa, 2026-09-20): on a far tick, if the chronicle
     # has not moved in CHRONICLE_EVERY ticks, it takes the draw ahead of
-    # the far actors it would otherwise queue behind.
+    # the far actors it would otherwise queue behind -- unless the gate would hold it (_age_held: a season ahead of the players): a held age
+    # is never drawn, so never stamped, so overdue again at the next far tick, and took every far tick of Stonemarch's from tick 72 to
+    # 2525 (2026-10-27: the Temple's priests had no turn in 400 ticks). Held, it competes below as a far actor, where the gate holds it
+    # and lets the rest run.
     if far_tick and chronicle is not None and chronicle in last_by and world.bhuvana:
         e = canon.entities[chronicle]
         if e.last_simulated_tick is None or canon.world_time - e.last_simulated_tick >= pace["chronicle_every"]:
-            log_event("smrti.age_moves", tick=canon.world_time, last=e.last_simulated_tick)
-            return [chronicle]
+            if not _age_held(world):
+                log_event("smrti.age_moves", tick=canon.world_time, last=e.last_simulated_tick)
+                return [chronicle]
 
     def gave_nothing(sid: str) -> bool:
         """Its name: nidrā (निद्रा), sleep (v5 §38)."""
@@ -399,8 +421,8 @@ def _kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[st
     for eid in pool:
         if eid == chronicle:
             # the age runs ahead of the players, a season at most (Marc, 2026-09-25); its own grain, no cap
-            ahead = (_age_clock(world) or kala.start) - max(clocks.values())
-            if ahead > int(world.pace()["age_lead"]):
+            ahead = _age_ahead(world)
+            if ahead is not None and ahead > int(world.pace()["age_lead"]):
                 log_event("smrti.age_waits", tick=world.canon.world_time, ahead=ahead)
             else:
                 age_draw = True

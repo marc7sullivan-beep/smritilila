@@ -71,7 +71,7 @@ from smritilila.memory.record import Record
 from smritilila.smrti.context import NOWHERE, PARTICIPANTS, PARTICIPATION_HALF_LIFE, PARTICIPATION_WINDOW
 from smritilila.smrti.samskara import Samskara, keep as keep_samskara
 from smritilila.smrti.kosha import Kosha
-from smritilila.smrti.kala import AGE_LEAD, chronicle_ids
+from smritilila.smrti.kala import AGE_LEAD, INTERRUPTION_HOURS, chronicle_ids
 from smritilila.smrti import prakriti
 from smritilila.sakshi import bind_world, current_world, log_event, set_world
 from smritilila.backup import backup_world
@@ -410,7 +410,7 @@ class WorldSession:
         """v5 §7: pacing is the world's -- its world data over today's values."""
         return {"scene_quiet_ticks": SCENE_QUIET_TICKS, "quiet_turns": QUIET_TURNS, "chronicle_every": CHRONICLE_EVERY, "age_lead": AGE_LEAD,
                 "far_every": FAR_EVERY, "near_window": NEAR_WINDOW, "scene_cadence": SCENE_CADENCE, "arrivals": True,
-                "arrivals_on_traffic": True,
+                "arrivals_on_traffic": True, "interruption_hours": INTERRUPTION_HOURS,
                 "participants": PARTICIPANTS, "participation_window": PARTICIPATION_WINDOW,
                 "participation_half_life": PARTICIPATION_HALF_LIFE,
                 **(self.world_data.get("pacing") or {})}

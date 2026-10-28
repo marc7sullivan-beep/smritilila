@@ -4,8 +4,8 @@
 routes a pulse runs through and what follows it. POST /pulses and its
 one-at-a-time submit, the commit that adopts what the live world moved
 on to meanwhile, the witnessing queued for each player, consent
-(/pulses/confirm, the held jumps and their release) with the window's
-own turns, the rounds' routes, the world's activation after a commit
+(/pulses/confirm, the held jumps and their release) with the die that may
+interrupt a long jump, the rounds' routes, the world's activation after a commit
 and phala's reckoning.
 
 Moved whole from main.py, nothing inside changed. The model call is
@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import random
 import re
 import time
 
@@ -59,10 +60,10 @@ from smritilila.sangama import (
 from smritilila.memory.memory import Memory
 from smritilila.memory.record import Record
 from smritilila.smrti.context import NOWHERE
-from smritilila.smrti.pulse import SmrtiPulseResult, run_smrti_pulse, split_heard
+from smritilila.smrti.pulse import SmrtiPulseResult, fortune_seed, run_smrti_pulse, split_heard
 from smritilila.smrti.genesis import ITIHASA
 from smritilila.smrti.log import v3_enclosure
-from smritilila.smrti.kala import apart, names_any, presence_line, watch_phrases, world_turn
+from smritilila.smrti.kala import apart, interruption_chance, names_any, watch_phrases
 from smritilila.training_data import log_discarded
 from smritilila.sakshi import log_event
 from smritilila.itihasa import _age_at, _age_clock
@@ -105,7 +106,7 @@ async def _submit_smrti_pulse(
     req: PulseRequest, world: WorldSession, acting_entity_id: str, roles: GenerativeRoles,
     background_tasks: BackgroundTasks, request_start: float, confirmed: bool = False, wait_until: int | None = None,
     window: list[tuple[int, str, str]] | None = None, sangama: dict | None = None, runner: str | None = None,
-    setting: list[tuple[str, str]] | None = None,
+    setting: list[tuple[str, str]] | None = None, interrupt: tuple[int, str] | None = None,
 ) -> PulseResponse:
     if roles.smrti_client is None:
         raise HTTPException(503, "no LLM client for the v3 Narrator")
@@ -134,7 +135,7 @@ async def _submit_smrti_pulse(
             list(world.recent_memories), roles.smrti_client, adhisthana.get_embedder().embed, players=world.unvoiced(),
             records=list(world.records), action_source=action_source, movable=world.movable(),
             playable=frozenset(world.playable_entity_ids), view=world.view(),
-            absent=world.absent(), returning=returning, confirmed=confirmed, wait_until=wait_until, window=window, setting=setting,
+            absent=world.absent(), returning=returning, confirmed=confirmed, wait_until=wait_until, window=window, setting=setting, interrupt=interrupt,
             samskara=world.samskara(),
             sangama=dict(sangama["others"]) if sangama else None,
             sangama_sources=sangama["sources"] if sangama else None,
@@ -313,18 +314,24 @@ async def _confirmed(world: WorldSession, held: dict, actor: str, background_tas
     roles = adhisthana._resolve_roles()
     start = time.monotonic()
     if held["kind"] == "long" and held.get("to") is not None:
-        # v5 §22: the world takes its turn in the window before the player lives it
-        events, setting = await _window_turns(world, roles, actor, held)
-        if events or setting:
-            # v4.32: the held telling was written blind to the window; it is told again, shown what happened in it
-            # (it stops at the first that reaches the actor) and the world around it (the same sky, never a stop)
-            log_discarded(pulse_id=held["pulse_id"], reason="window_rerun", detail=f"{len(events)} events, {len(setting)} rows")
-            log_event("smrti.window_rerun", pulse_id=held["pulse_id"], entity_id=actor, events=len(events), setting=len(setting))
+        # v5 §22 (Marc, 2026-10-27: "It's the wrong flow"): no scene takes a turn before the player lives a long jump. What next door already
+        # RECORDED in its time stops it (no model call); else one die is rolled, its chance rising with the jump's length, and if it falls the
+        # jump is told again, once, stopping at the minute the die drew, for the Narrator to say what interrupts. Before, up to three scenes were
+        # asked one after another and the telling thrown away and told again: a median 30 s after Yes over 173 jumps, and in 89% of those
+        # turns nothing found.
+        events, setting = _recorded_events(world, actor, held)
+        interrupt = None if events else _interruption(world, held, actor)
+        if events or interrupt:
+            # v4.32: the held telling was written blind to what is recorded in its time; it is told again, shown it (it stops at the first
+            # that reaches the actor) and the world around it (the same sky, never a stop)
+            log_discarded(pulse_id=held["pulse_id"], reason="window_rerun" if events else "interrupted",
+                          detail=f"{len(events)} events, {len(setting)} rows" if events else f"minute {interrupt[0]}")
+            if events:
+                log_event("smrti.window_rerun", pulse_id=held["pulse_id"], entity_id=actor, events=len(events), setting=len(setting))
             return await _submit_smrti_pulse(held["req"], world, actor, roles, background_tasks, start, confirmed=True,
-                                             window=events or None, setting=setting or None,
+                                             window=events or None, setting=setting or None, interrupt=interrupt,
                                              wait_until=(rnd or {}).get("from"), **rkw)
-        # no turn wrote anything: the pulse stands as lived, on the live world (its commit adopts only
-        # what it bound or minted -- the window's turns moved their own bookkeeping on)
+        # nothing in the way: the pulse stands as lived, on the live world (its commit adopts only what it bound or minted)
         working = held["working_canon"]
         working.world_time = world.canon.world_time + 1
         # not yet written: it is committed after the window's turns, and carries the tick it lands at
@@ -345,36 +352,14 @@ async def _confirmed(world: WorldSession, held: dict, actor: str, background_tas
                                      wait_until=(rnd or {}).get("from"), **rkw)
 
 
-WINDOW_TURNS = 3  # scenes next to where a long action ends: bounded, whatever the world's size
-
-
-async def _window_turns(world: WorldSession, roles: GenerativeRoles, actor: str,
-                        held: dict) -> tuple[list[tuple[int, str, str]], list[tuple[str, str]]]:
-    """v5 §22 (Marc, 2026-09-25): a consented long action does not write the
-    world's time alone. Before the actor lives it, up to three scenes next
-    to where it ends are each asked whether anyone came -- in the window
-    only, by kala.world_turn with the window's end as reference -- and
-    commit what they find; the scenes the actor attends to (the held pulse
-    bound them) first. What the held pulse bound is the actor's: a window
-    turn never voices or moves it (asked, the inn had the passenger Teo sent
-    up come in and buy bread -- live, tick 660). Not the actor's own scenes:
-    the actor's pulse narrates those (asked, the landing ferried the
-    actor's passenger over itself -- live, Crossing tick 653).
-
-    A window turn is told only that the actor is there, never what they do,
-    and not to describe them, their place or what is with them: their time
-    may yet be cut short, and a row that told it could not be unwritten
-    (shown the account, the crossing had Teo on the post till noon). A row
-    that names them anyway -- by the engine's own names and labels only
-    (kala.watch_phrases) -- counts as an event: the actor's pulse runs again
-    and holds it. Once one turn finds an event, the rest end there.
-    Returns what HAPPENED that is not the actor's doing (a move, mark or
-    line by someone the held pulse did not bind; a row naming what is the
-    actor's), as (minute, place, its row) -- and the quiet turns' own rows,
-    as (place, its row): the world around in the same hours, whose weather,
-    light and water the actor's telling must share (v4.32; the Crossing, 2026-09-28:
-    Teo's held telling had rain and a flood, the window's turns frost and a low
-    river, each blind to the other)."""
+def _recorded_events(world: WorldSession, actor: str, held: dict) -> tuple[list[tuple[int, str, str]], list[tuple[str, str]]]:
+    """v5 §22: what the scenes next to where a long jump ends already RECORDED in its time -- no model call. Returns (events, the world
+    around): what HAPPENED that is not the actor's doing (a move, mark or line by someone the held pulse did not bind; a row naming what is
+    the actor's, by the engine's own names and labels only: kala.watch_phrases), as (minute, place, its row), and the quiet rows, as
+    (place, its row), whose weather, light and water the actor's telling shares. The scenes the actor attends to (the held pulse bound them)
+    first; not the actor's own scenes (the actor's pulse narrates those). It was `_window_turns` before 2026-10-27, which ran up to three of
+    those scenes' turns for the span on top of this; they are gone, and only the recorded is read.
+    Cost: the neighbours' own rows and one pass over the records, per long jump (`_recorded_around`)."""
     kala = world.samskara().kala  # kept, read on with what was committed
     if kala is None:
         return [], []
@@ -385,52 +370,36 @@ async def _window_turns(world: WorldSession, roles: GenerativeRoles, actor: str,
     mine = set(held["result"].bound_ids) | {e.id for e in held["result"].new_entities} | {actor}
     near = [x for x in k.neighbours(dest, t) if k.is_scene(x) and x not in theirs] if dest else []
     scenes = sorted(near, key=lambda x: x not in mine)  # what the actor attends to first (the far bank watched), then the rest
-    events: list[tuple[int, str, str]] = []
-    setting: list[tuple[str, str]] = []
     with_them = {x for x in mine if not k.is_scene(x)}
     watched = watch_phrases(k, with_them | ({dest} if dest else set()))
-    end = held["to"]
-    # what next door already recorded in this time is shown as a fresh turn's rows are (Marc, 2026-10-01): an event
-    # by the same rule, or the world around -- and an event ends the window there, for the fresh turns too
-    recorded, around = _recorded_around(world, scenes, held["from"], end, mine, watched)
-    events += recorded
-    setting += around
-    if recorded:
-        end = min(end, min(m for m, _w, _t in recorded))
-    paused = _paused(world)
-    for sid in [x for x in scenes if x not in paused][:WINDOW_TURNS]:
-        turn = world_turn(kala, k, sid, sid, end, t)
-        if turn is None:
-            continue
-        own, cap = turn
-        begin = max(own, held["from"])
-        cap = own + cap - begin
-        if cap <= 0:
-            continue
-        n_mem, n_rec = len(world.recent_memories), len(world.records)
-        await _run_smrti_activation_in_background(
-            world, roles, sid, 1, begin=begin, cap=cap, shown=[presence_line(kala, actor, held["from"], end, dest, with_them)],
-            theirs=frozenset(mine))  # the actor's people and things: never voiced or moved by the world's turn
-        mems, recs = world.recent_memories[n_mem:], world.records[n_rec:]
-        happened = any((r.kind in ("kosha", "mark") and r.entity_id not in mine) or (r.kind == "said" and (r.note or "") not in mine)
-                       for r in recs)
-        named = sorted({x for m in mems if m.entity_id == m.location_id for x in names_any(m.experience, watched)})
-        if named:
-            log_event("smrti.window_named", scene=sid, named=named)
-            happened = True  # told of the actor after all: it holds, and the actor's pulse must hold it
-        if happened:
-            found = [(m.ended, m.location_id, m.experience) for m in mems if m.entity_id == m.location_id and m.ended is not None]
-            events += found
-            if found:
-                end = min(end, min(m for m, _w, _t in found))  # the rest of the world's turns end at the first event
-        else:
-            setting += [(m.location_id, m.experience) for m in mems if m.entity_id == m.location_id and m.experience]
-        log_event("smrti.window_turn", scene=sid, begin=begin, cap=cap, happened=happened,
-                  memories=len(mems), records=len(recs))
-        kala = world.samskara().kala  # kept, read on with what was committed
-        k = world.kosha()
-        t = world.canon.world_time + 1
-    return sorted(events), setting
+    return _recorded_around(world, scenes, held["from"], held["to"], mine, watched)
+
+
+def _interruption(world: WorldSession, held: dict, actor: str) -> tuple[int, str] | None:
+    """v5 §22 (Marc, 2026-10-27: "a probability of an interrupting event as a function of the length of time of the jump. The event should
+    occur randomly over the length of the jump. If the jump is interrupted then a single model call to narrate the interruption."): the die
+    for a long jump its player agreed to. The chance is `kala.interruption_chance` of the jump's length at the world's mean time between
+    interruptions (pacing `interruption_hours`, 96 by default); if it falls, the minute is drawn uniformly over the jump and the scene is
+    the one the actor ends in (or stands in, if it goes nowhere). A scene closed to arrivals (pacing `arrivals` false, v5 §15) is never
+    interrupted: nothing comes in. The die is the pulse's own, as the fortune is (`fortune_seed`: whose and when, never the attempt):
+    declining and trying again meets the same one, and a longer jump is interrupted whenever a shorter one was. The engine says only that
+    something does, and when: what it is, is the Narrator's (s0). Witnessed whatever the die gave: smrti.interruption_roll.
+    Cost: one scene's pacing and a random draw -- no model call."""
+    a, b = held["from"], held["to"]
+    span = b - a
+    scene = held.get("dest") or held.get("origin")
+    mean = world.pace()["interruption_hours"]
+    chance = interruption_chance(span, mean)
+    closed = bool(scene) and world.kosha().seed("pacing", scene, world.canon.world_time + 1, field="arrivals") is False
+    drawn = minute = None
+    if chance > 0 and scene and not closed:
+        rng = random.Random(fortune_seed(actor, held["working_canon"].world_time) + ":interruption")
+        drawn = rng.random()
+        if drawn < chance:
+            minute = a + 1 + int(rng.random() * max(1, span - 1))
+    log_event("smrti.interruption_roll", pulse_id=held["pulse_id"], entity_id=actor, minutes=span, mean_hours=mean, chance=round(chance, 4),
+              drawn=None if drawn is None else round(drawn, 4), minute=minute, scene=scene, closed=closed)
+    return (minute, scene) if minute is not None else None
 
 
 def _recorded_around(world: WorldSession, scenes: list[str], a: int, b: int, mine: set[str],
@@ -534,7 +503,7 @@ async def _reckon(world: WorldSession, players: list[str], scene: str | None) ->
 
 async def _run_smrti_activation_in_background(
     world: WorldSession, roles: GenerativeRoles, activated_entity_id: str, pulses_run: int, *,
-    begin: int | None = None, cap: int | None = None, shown: list[str] | None = None, theirs: frozenset[str] = frozenset(),
+    begin: int | None = None, cap: int | None = None,
 ) -> None:
     """v3 autonomy, provisional (phase 5): `activated NPC = last tuple +
     generated action` -- the same v3 call with no action supplied.
@@ -549,22 +518,19 @@ async def _run_smrti_activation_in_background(
     the live world (_adopt) -- its memories appended, what it bound or
     minted merged -- and the live canon's world_time left alone.
 
-    What the gate gave the turn -- `begin` and `cap` (v5 §23, kala.world_turn),
-    and for a window turn the lines it is `shown` and what is `theirs` --
+    What the gate gave the turn -- `begin` and `cap` (v5 §23, kala.world_turn) --
     goes to its first pulse only, as it always did."""
     for _ in range(pulses_run):
         # v5 §33: one pulse per scene at a time -- the snapshot is taken
         # once the scene is ours, so this turn reads the last one's result
         async with world.in_scene(world.kosha().scene_of(activated_entity_id, world.canon.world_time + 1), "activation",
                                   activated_entity_id):
-            await _run_one_activation(world, roles, activated_entity_id, begin=begin, cap=cap, shown=shown, theirs=theirs)
-        begin = cap = shown = None
-        theirs = frozenset()
+            await _run_one_activation(world, roles, activated_entity_id, begin=begin, cap=cap)
+        begin = cap = None
 
 
 async def _run_one_activation(world: WorldSession, roles: GenerativeRoles, activated_entity_id: str, *,
-                              begin: int | None = None, cap: int | None = None, shown: list[str] | None = None,
-                              theirs: frozenset[str] = frozenset()) -> None:
+                              begin: int | None = None, cap: int | None = None) -> None:
     started_at = world.canon.world_time
     snapshot_canon = world.canon.fork()
     snapshot_memories = list(world.recent_memories)
@@ -586,9 +552,9 @@ async def _run_one_activation(world: WorldSession, roles: GenerativeRoles, activ
             run_smrti_pulse, snapshot_canon, activated_entity_id, None, snapshot_canon.world_time, pulse_id,
             snapshot_memories, roles.smrti_client, adhisthana.get_embedder().embed,
             as_origin=is_scene,
-            players=world.unvoiced() | theirs, movable=world.movable(),
+            players=world.unvoiced(), movable=world.movable(),
             playable=frozenset(world.playable_entity_ids), view=world.view(),
-            absent=world.absent(), max_elapsed=cap, wait_until=begin, shown=shown,
+            absent=world.absent(), max_elapsed=cap, wait_until=begin,
             # an away player the world now acts for, back in the world: this turn narrates it
             returning=world.left_at(activated_entity_id) if activated_entity_id in world.returning else None,
             as_chronicle=(world.bhuvana or "") if is_chronicle else None,

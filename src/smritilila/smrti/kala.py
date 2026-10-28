@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import bisect
 import copy
+import math
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -58,6 +59,7 @@ FIRST_WINDOW = 60      # a place or person with no time of its own is first aske
 CONFIRM_MINUTES = 30   # a player's pulse longer than this asks first (the world's may differ); 30 from 2026-10-16 (Marc: every world, to match Stonemarch's), was 10: a new world is born with it
 ITIHASA = "itihasa"    # Entity.origin of the world at large (genesis.py plants it)
 AGE_LEAD = 131_400     # a season, in minutes: the chronicle waits while further ahead of the latest player
+INTERRUPTION_HOURS = 96  # v5 §22 (Marc, 2026-10-27: "96 is better"): the mean time between interruptions of a long jump; a world sets its own (pacing "interruption_hours")
 
 
 def chronicle_ids(canon) -> frozenset[str]:
@@ -563,15 +565,25 @@ def setting_line(rows: list[tuple[str, str]]) -> str:
             + " | ".join(f"in {where}: {text}" for where, text in rows))
 
 
-def presence_line(kala: Kala, who: str, a: int, b: int, where: str | None, theirs: Iterable[str]) -> str:
-    """A world's turn in a player's window is told only that they are there
-    -- never what they do: their time is theirs to tell, and may yet be cut
-    short. It does not describe them, where they are, or what is with them."""
-    with_them = sorted(set(theirs) - {who, where})
-    return (f"IN THIS TURN'S TIME A PLAYER IS AT {where or 'a place nearby'}, from {kala.say(a)} to {kala.say(b)}: {who}"
-            + (f", with {', '.join(with_them)}" if with_them else "")
-            + ". That place, the player and what is with them are not this turn's to tell: do not describe them at all -- "
-              "not seen, not heard, not their tracks. Narrate only this scene, and what comes to it or goes from it.")
+def interruption_chance(minutes: int, mean_hours: float | None) -> float:
+    """The chance a long jump of `minutes` is interrupted: 1 - exp(-T / mean), the mean time between interruptions (Marc, 2026-10-27: "a
+    probability of an interrupting event as a function of the length of time of the jump"). It never reaches 1 and is nearly sure
+    for a jump of weeks: at 96 hours, 1 h 1%, 8 h 8%, a day 22%, three days 53%, a week 83%. None or 0: a world with none."""
+    if not mean_hours or mean_hours <= 0 or minutes <= 0:
+        return 0.0
+    return 1.0 - math.exp(-(minutes / 60.0) / float(mean_hours))
+
+
+def interruption_line(kala: Kala, minute: int, where: str, minutes_in: int) -> str:
+    """What the Narrator is shown of a long jump that is interrupted (routes/spanda.py's `_interruption` drew the minute): the engine says only
+    that something does, and when and where -- it knows no kind (s0); what it is is the Narrator's, as a quiet scene's arrival is (rule B).
+    The action is lived up to the minute and stops there, as at the first of a window's events."""
+    return (f"SOMETHING INTERRUPTS THIS ACTION at {kala.say(minute)}, in {where}, {span_said(max(1, minutes_in))} into it: the action is lived "
+            f"only up to that moment and stops there -- the narration ends at that moment, and `elapsed_minutes` ends there too "
+            f"({max(1, minutes_in)}). What interrupts is yours to say: what this place, this world and this hour would bring to the actor -- "
+            "someone or something arriving, a sound, a change in the weather or the water, news, a need -- as small or as grave as it would be; "
+            "it reaches the actor, and anyone new is declared as anything new is, never someone the memory knows to be elsewhere. "
+            "Narrate the action up to that moment, then the interruption as the actor meets it, and nothing after.")
 
 
 def watch_phrases(kosha, ids: Iterable[str]) -> tuple[set[str], set[str]]:

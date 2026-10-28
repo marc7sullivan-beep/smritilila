@@ -43,8 +43,8 @@ from smritilila.smrti.narrator import (
 )
 from smritilila.sakshi import log_event
 from smritilila.training_data import log_discarded
-from smritilila.smrti.kala import (Kala, age_line, age_minutes, apart, changes_in, chronicle_ids, lived_line, lived_span, mirror, near_line, near_lived, presents_line,
-                              setting_line, time_line, window_line, world_span, _minutes)
+from smritilila.smrti.kala import (Kala, age_line, age_minutes, apart, changes_in, chronicle_ids, interruption_line, lived_line, lived_span, mirror, near_line, near_lived,
+                              presents_line, setting_line, time_line, window_line, world_span, _minutes)
 from smritilila.smrti.prakriti import DARSANA
 from smritilila.text import runs, sentences, shared_run, units, weight
 from smritilila.text import slug as _slug
@@ -326,11 +326,15 @@ THREAD_RECENT = 15  # the actor's last own tuples: whoever is in them has been "
 
 
 def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, present: set[str], here: str | None,
-                       kosha=None) -> str:
+                       kosha=None, named: bool = False) -> str:
     """The second suggestion's ground, chosen by the engine (2026-09-21):
     the PERSON the actor's weightier own tuples are most about, who is not
     here and not in the actor's last THREAD_RECENT tuples; else such a
-    SCENE stood in and not lately; else nothing."""
+    SCENE stood in and not lately; else nothing.
+
+    `named` (2026-10-27): a tuple is also about whom it names in its words, not only whom it lists. Asked on a being's own turn, where the
+    thread is the matter of their own they have been leaving; a player's second suggestion is as it was until that is replayed (it moves
+    7 of 10 players' threads in Stonemarch, some from a place to a person)."""
     from smritilila.smrti.narrator import SALIENCE_NAMES
     memories = list(memories)
     has_stream = {m.entity_id for m in memories}
@@ -362,10 +366,15 @@ def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, p
         if key not in anchor or rank[:3] < anchor[key][:3]:
             anchor[key] = rank
 
+    # Whom a weighty tuple is ABOUT: those it lists, and (`named`) those it names in its words. A seed's plans list no one (the world builder
+    # writes `subject_ids` []), and a being's later tuples list only who was with them, so what a being means to do about someone absent -- the
+    # water priest's captives, the earth priest's scheme against him -- was in prose only, and the thread could not find it (Stonemarch,
+    # 2026-10-27). `names_in` is exact and keyed by the text's words, and runs on the few weighty tuples, not the stream.
+    among = has_stream - {actor_id}
     for m in older:
         if m.salience > 3:
             continue
-        for p in m.subject_ids:
+        for p in set(m.subject_ids) | (set(names.names_in(m.experience, among)) if named else set()):
             e = canon.entities.get(p)
             if p == actor_id or p in lately or p not in has_stream or e is None or names.is_scene(p) or not e.labels:
                 continue
@@ -1714,6 +1723,7 @@ def run_smrti_pulse(
     no_scene: dict[str, str | None] | None = None,
     not_to_intend: frozenset[str] | None = None,
     holder_full: dict[str, tuple[str, int, list[str]]] | None = None,
+    interrupt: tuple[int, str] | None = None,
 ) -> SmrtiPulseResult:
     """retrieve -> narrate -> append, in named steps: the context (v5 §26),
     the Narrator's answer cleaned, everything placed (v5 §10), the tuples and
@@ -1762,7 +1772,9 @@ def run_smrti_pulse(
     holder_full: set only by this function's own second pass (the fanout rerun)
     -- {holder: (its name, the places it lists, the new places the first telling
     put directly in it)}: told the holder is full, to make one new place for the
-    group inside it (holders_full)."""
+    group inside it (holders_full).
+    interrupt: (minute, scene) -- a long jump the player agreed to that the die interrupted (routes/spanda.py `_interruption`, v5 §22: one
+    roll, its chance rising with the jump's length): the action is lived up to that minute and the Narrator says what breaks in."""
     call = dict(locals())  # the call itself, for a second narration (_again): every argument, never a copied list of them
     sangama = dict(sangama or {})
     acting = {p: a for p, a in sangama.items() if a and a.strip()}
@@ -1860,6 +1872,8 @@ def run_smrti_pulse(
         # goes where the action goes, and a closed destination asks its player after (below).
         if window:
             kala_lines.append(window_line(kala, window))
+        if interrupt and interrupt[0] > time_now:
+            kala_lines.append(interruption_line(kala, interrupt[0], interrupt[1], interrupt[0] - time_now))
         if setting:  # v4.32: the window's quiet turns -- the same hours around the actor, the same sky
             kala_lines.append(setting_line([(log.kosha.label(s), text) for s, text in setting]))
         kala_lines += shown or []  # routes/spanda.py's: a window turn is shown the player's own time in it
@@ -1970,7 +1984,10 @@ def run_smrti_pulse(
     handles = handle_map(ctx, {i: e.labels for i, e in canon.entities.items()})
     if handles.id_to_handle:
         log_event("smrti.handles", pulse_id=pulse_id, count=len(handles.id_to_handle))
-    thread = thread_from_memory(canon, memories, actor_id, ctx.present, ctx.place, log.kosha) if action_text is not None else ""
+    # the thread is the matter of their own a being has been leaving: on a player's pulse it grounds the second suggestion; on a being's own turn
+    # (no action, not a quiet scene's ask, not the age's) it is what the being may set about (rule A). Before 2026-10-27 only the first.
+    own_turn = action_text is None and not as_origin and as_chronicle is None
+    thread = thread_from_memory(canon, memories, actor_id, ctx.present, ctx.place, log.kosha, named=own_turn) if (action_text is not None or own_turn) else ""
     if thread:
         log_event("smrti.thread", pulse_id=pulse_id, actor=actor_id, thread=thread[:120])
     own_words = {}
@@ -2096,7 +2113,7 @@ def run_smrti_pulse(
                    or lived is not None or window is not None
                    or unshown is not None or hidden is not None or meet_at is not None or setting is not None
                    or not_here is not None or no_scene is not None or not_to_intend is not None
-                   or holder_full is not None)  # one rerun per pulse, whichever
+                   or holder_full is not None or interrupt is not None)  # one rerun per pulse, whichever
     # the fanout rerun's finding: new places put straight into a holder that already lists FANOUT_CAP or more (carried by any rerun)
     full_holders = holders_full(b.kosha, b, pl.records, pl.t_after) if not second_pass and as_chronicle is None else {}
     lived_rerun: frozenset[str] = frozenset()
