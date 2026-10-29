@@ -290,6 +290,8 @@ class WorldSession:
     recent_joins: dict = field(default_factory=dict)
     presence: dict[str, str] = field(default_factory=dict)
     last_seen: dict[str, float] = field(default_factory=dict)
+    # runtime: when each player last acted (an action, a round's); a beat keeps them online and is not an act (acting(), below)
+    last_acted: dict[str, float] = field(default_factory=dict)
     # Marc, 2026-09-24: who logged off (persisted -- an explicit log off;
     # from 2026-09-25 also thirty minutes without acting, _log_off_idle),
     # and who is back and not yet narrated so (returning, below)
@@ -378,6 +380,19 @@ class WorldSession:
             return False
         seen = self.last_seen.get(pid)
         return seen is not None and time.monotonic() - seen < PLAYER_IDLE_SECONDS
+
+    def acting(self, pid: str) -> bool:
+        """Online, and taking turns (Marc, 2026-10-28: "Exclude waiting players"). A waiting player is one the world carries and
+        draws no turn for (v4.58); present only by the beat -- a held bot, which posts no action, ever -- they are away in all but
+        name, and the world does not wait on their clock: Stonemarch's present stood at Dunstan's 42,399 while Nagresh played at
+        89,515, so no chieftain, troll or dragon was drawn. Waiting and acting within PLAYER_IDLE_SECONDS (an agent playing,
+        a person back at a page whose setting they left at waiting), they are a player like any other."""
+        if not self.online(pid):
+            return False
+        if pid not in self.waiting:
+            return True
+        acted = self.last_acted.get(pid)
+        return acted is not None and time.monotonic() - acted < PLAYER_IDLE_SECONDS
 
     def unvoiced(self) -> frozenset[str]:
         """Players the Narrator never voices in another's turn (v5 §37): all

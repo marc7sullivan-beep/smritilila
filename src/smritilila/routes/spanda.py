@@ -114,7 +114,7 @@ async def _submit_smrti_pulse(
     # suggestion; anything else the player typed
     action_source = "suggested" if req.action_text.strip() in world.offered.get(acting_entity_id, set()) else "typed"
     world.presence[acting_entity_id] = "online"  # v5 §37: acting is being here
-    world.last_seen[acting_entity_id] = time.monotonic()
+    world.last_seen[acting_entity_id] = world.last_acted[acting_entity_id] = time.monotonic()
     if world.come_back(acting_entity_id):
         await _store(world).save_logged_off(sorted(world.logged_off))
     returning = world.left_at(acting_entity_id) if acting_entity_id in world.returning else None
@@ -214,6 +214,30 @@ async def _commit_smrti_result(world: WorldSession, working_canon: Maya, result:
               records=len(result.records_written))
 
 
+def _draw(world: WorldSession) -> tuple[list[str], dict[str, tuple[int, int]]]:
+    """The world's draw after a pulse: the pool, what holds it, the kāla gate (v5 §38). Returns the drawn and each gated turn's (begin, cap).
+
+    A draw that leaves nobody is drawn again, once (Marc, 2026-10-28: "When we have that kind of block we should redraw the autonomous action
+    instead of skipping"). The engaged scene has the draw alone; when the gate holds its candidates (they stand at the player's present, so NPCs
+    follow and never lead), a round is open, or the scene is paused, nobody was drawn, and Stonemarch's far windows at ticks 2536 and 2537 went
+    by with the world's far beings unasked. The tick becomes the cadence's own off-beat: the rest of the world, the player's scene left out,
+    through the same filters and the same gate. Cost: the pool and the filters once more, about 0.2 s, on a tick that would have drawn nobody;
+    the budget stays one activation a tick."""
+    def through(pool: list[str]) -> tuple[list[str], dict[str, tuple[int, int]]]:
+        return _kala_gate(world, _hold_for_rounds(world, _hold_for_away(world, _fold_absorbed(world, pool))))
+
+    first = _smrti_exploration_pool(world)
+    drawn, turns = through(first)
+    if drawn:
+        return drawn, turns
+    rest = _smrti_exploration_pool(world, redraw=True)
+    if set(rest) == set(first):  # no engaged scene narrowed the first draw: it was the whole pool, and drawing it again would draw the same
+        return drawn, turns
+    drawn, turns = through(rest)
+    log_event("smrti.redrawn", tick=world.canon.world_time, blocked=len(first), rest=len(rest), drawn=len(drawn))
+    return drawn, turns
+
+
 def _after_smrti_commit(world: WorldSession, roles: GenerativeRoles, background_tasks: BackgroundTasks, result: SmrtiPulseResult,
                         acting_entity_id: str, pulse_id: str, request_start: float, runner: str | None = None,
                         defaulted: dict[str, str] | None = None) -> PulseResponse:
@@ -227,7 +251,7 @@ def _after_smrti_commit(world: WorldSession, roles: GenerativeRoles, background_
     all_narrations = {acting_entity_id: result.narration}
     all_promoted = [e.id for e in result.new_entities]
 
-    pool, turns = _kala_gate(world, _hold_for_rounds(world, _hold_for_away(world, _fold_absorbed(world, _smrti_exploration_pool(world)))))
+    pool, turns = _draw(world)
     _log_pool(world, pool)
     tick_result = advance_world_tick(world.canon, world.canon.world_time, pool)
     if tick_result.pulses_run and tick_result.activated_entity_id is not None:
@@ -734,7 +758,7 @@ async def _round_submit(world: WorldSession, roles: GenerativeRoles, background_
     """An action into the scene's round (acted again, it replaces the last).
     The round is written as soon as every player there has acted."""
     world.presence[pid] = "online"  # v5 §37: acting is being here
-    world.last_seen[pid] = time.monotonic()
+    world.last_seen[pid] = world.last_acted[pid] = time.monotonic()
     r = world.rounds.setdefault(scene, {"actions": {}, "sources": {}, "order": [], "running": False})
     if r["running"]:
         raise HTTPException(409, "the round is being written: act again once it is told")

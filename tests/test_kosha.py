@@ -11,6 +11,8 @@ restated here against moves, records and declared names.
 """
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 
 from smritilila import adhisthana
@@ -2310,14 +2312,48 @@ def test_a_quiet_thing_that_never_kept_a_memory_is_folded_out_of_the_draw() -> N
     assert pravrtti._fold_absorbed(world, ["chest", "jaroo"]) == ["jaroo"]
     world.recent_memories.append(_mem(4, "teo", 499, "I looked at an iron-banded chest.", "lair"))
     assert pravrtti._fold_absorbed(world, ["chest", "jaroo"]) == ["chest", "jaroo"]  # mentioned lately: awake
-    canon.world_time = 400  # within the window of its own last tuple: not quiet
+    canon.world_time = 400  # within the window of its own last tuple, which matters (weighty): not quiet
     world.recent_memories = world.recent_memories[:3]
+    world.recent_memories[0] = dataclasses.replace(world.recent_memories[0], salience=3)
     assert "chest" in pravrtti._fold_absorbed(world, ["chest", "jaroo"])
+    world.recent_memories[0] = dataclasses.replace(world.recent_memories[0], salience=4)  # notable only: the same tuple no longer wakes it
+    canon.world_time = 401                                                                   # (and its own placing at 360 is out of the window)
+    assert "chest" not in pravrtti._fold_absorbed(world, ["chest", "jaroo"])
     # the world at large is the age's chronicler: never kept, never folded (Stonemarch t521 folded it)
     canon.world_time = 500
     canon.entities["age"] = Entity("age", ["the world at large"], 0, "itihasa")
     world.recent_memories.append(_mem(9, "age", 300, "The season turned in the Viscounty.", "age", use="none"))
     assert "age" in pravrtti._fold_absorbed(world, ["chest", "age"]) and "chest" not in pravrtti._fold_absorbed(world, ["chest", "age"])
+
+
+def test_a_copy_of_the_rooms_doings_does_not_keep_a_never_kept_thing_awake() -> None:
+    """Marc, 2026-10-28 ("Build 1"). Stonemarch's 34 probes since the 16:16 restart were each a thing beside Nagresh, drawn to write that cold water
+    dripped; 21 of them had never kept anything and had nothing of their own in forty ticks but the copy of the room that every pulse of a player
+    writes the things and the dead around them (`use: none`, habitual). That copy is not the thing's doing: only a tuple that matters (kept, or
+    weighty) keeps it awake, as a mention still does."""
+    canon = Maya(world_time=500, entities={
+        "lair": Entity("lair", ["the ogre's lair"], 0, "smrti", avarana="scene"),
+        "chest": Entity("chest", ["an iron-banded chest"], 360, "smrti"),
+        "teo": Entity("teo", ["Teo"], 0, "genesis"),
+    })
+    world = adhisthana.WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["lair"], playable_entity_ids=["teo"])
+    copy = dataclasses.replace(_mem(5, "chest", 495, "Boots crossed the floor above me.", "lair", use="none"), salience=7)
+    world.recent_memories = [_mem(1, "chest", 371, "Hands pried at my hasp.", "lair", use="none"), _mem(3, "teo", 495, "I walked the road.", "lair"), copy]
+    world.records = [_rec(1, "chest", "lair", 360)]
+    assert pravrtti._fold_absorbed(world, ["chest"]) == []                                            # the copy of the room: folded, not drawn
+    for salience, use, text in ((5, "none", "A lamp swung over me."), (4, "none", "Dust shook from the beams.")):
+        world.recent_memories[2] = dataclasses.replace(copy, salience=salience, use=use, experience=text)
+        assert pravrtti._fold_absorbed(world, ["chest"]) == [], (salience, use)                       # ordinary or notable: still the room
+    for salience, use, text in ((3, "none", "An axe bit my lid."), (1, "none", "I was split in two."), (6, "useful", "A key was turned in my lock."),
+                                (7, "key", "The ledger was hidden in me.")):
+        world.recent_memories[2] = dataclasses.replace(copy, salience=salience, use=use, experience=text)
+        assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"], (salience, use)                # weighty or kept: it was handled
+    world.recent_memories[2] = copy
+    world.recent_memories.append(_mem(6, "teo", 499, "I looked at an iron-banded chest.", "lair"))      # a mention still wakes
+    assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"]
+    world.recent_memories.pop()
+    world.records.append(_rec(2, "chest", "lair", 480))                                                  # a move is activity, as before
+    assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"]
 
 
 def test_those_with_the_actor_lately_and_not_here_now_are_shown() -> None:

@@ -470,6 +470,59 @@ def test_a_world_turn_stops_at_an_offline_players_present_unless_the_world_may_a
     assert pravrtti._kala_gate(world, ["aunt"])[0] == ["aunt"]
 
 
+def _held_bot_world():
+    """Three far scenes: Wentworth (a person, playing) in the study at ONE+2H, a waiting bot kept online by its beat in the cellar at ONE, and an
+    orc in the yard at ONE+H -- between them, far from both. Both are online."""
+    import time as _time
+    scenes = {s: Entity(s, [f"the {s}"], 0, "genesis", avarana="scene") for s in ("study", "cellar", "yard")}
+    canon = Maya(world_time=6, entities={**scenes, "wen": Entity("wen", ["Wentworth"], 0, "genesis"), "bot": Entity("bot", ["Dunstan"], 0, "genesis"),
+                                         "orc": Entity("orc", ["the orc"], 0, "genesis")})
+    world = adhisthana.WorldSession(canon=canon, scene_owner_entity_id="wen", entry_point_location_ids=["study"], playable_entity_ids=["wen", "bot"])
+    world.world_data = {"clock": CLOCK}
+    world.records = [Record(f"k{i}", "kosha", e, into, 0, "p0", None) for i, (e, into) in enumerate([("orc", "yard"), ("bot", "cellar"), ("wen", "study")])]
+    world.recent_memories = [_m(1, "orc", "yard", 1, ONE, ONE + H), _m(2, "bot", "cellar", 2, ONE - 10, ONE), _m(3, "wen", "study", 3, ONE, ONE + 2 * H)]
+    world.autonomous.add("bot")
+    world.waiting.add("bot")                                      # as a stopped agent is left: waiting (player_tool stop)
+    world.last_seen["wen"] = world.last_seen["bot"] = _time.monotonic()
+    return world
+
+
+def test_a_waiting_player_present_only_by_the_beat_does_not_hold_the_worlds_present() -> None:
+    """Marc, 2026-10-28 ("Exclude waiting players"). Stonemarch's present stood at Dunstan's 42,399 for a day while Nagresh played at 89,515: Dunstan is a
+    held bot, kept online by a beat that posts no action, and the gate waited on the earliest online clock -- so no chieftain, no troll and no priest
+    had a turn (the 29 draws since the redraw were things, one the second model call each). A waiting player is the world's to carry; present by the beat
+    alone they take no turn, and the world does not wait on their clock. Acting, they are a player like any other (an agent playing; a person back
+    at a page they left at waiting): online outranks the setting, as movable() has it since 2026-09-30."""
+    import time as _time
+    from smritilila.adhisthana import PLAYER_IDLE_SECONDS
+    world = _held_bot_world()
+    assert world.online("bot") and world.acting("wen") and not world.acting("bot")
+    assert pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]          # the present is Wentworth's, the orc is behind it
+    world.last_acted["bot"] = _time.monotonic()                      # the bot acts: its clock is a present like any other
+    assert world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == []
+    world.last_acted["bot"] = _time.monotonic() - PLAYER_IDLE_SECONDS - 1   # it acted, long ago: a beat since
+    assert not world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]
+    world.waiting.discard("bot")                                     # not waiting: online is online, acted or not
+    assert world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == []
+
+
+def test_the_world_still_waits_on_a_beat_when_no_one_is_acting() -> None:
+    """The fallback is as it was: with no acting player the world's present is the earliest of the online, and with none online of all. An offline
+    Oldric, earlier than the bot, and an orc between them tell the three apart."""
+    world = _held_bot_world()
+    world.canon.entities.update({"attic": Entity("attic", ["the attic"], 0, "genesis", avarana="scene"), "old": Entity("old", ["Oldric"], 0, "genesis")})
+    world.playable_entity_ids.append("old")
+    world.records.append(Record("kold", "kosha", "old", "attic", 0, "p0", None))
+    world.recent_memories[0] = _m(1, "orc", "yard", 1, ONE, ONE + 30)           # the orc, at ONE+30
+    world.recent_memories[1] = _m(2, "bot", "cellar", 2, ONE, ONE + H)          # the bot, at ONE+H
+    world.recent_memories.append(_m(4, "old", "attic", 4, ONE - 20, ONE))       # Oldric, offline, at ONE (the world's first minute)
+    del world.last_seen["wen"]                                       # Wentworth's page is closed: only the bot's beat is left
+    assert not world.acting("bot") and world.online("bot")
+    assert pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]         # the earliest of the online is the bot's ONE+H: the orc is behind it
+    del world.last_seen["bot"]
+    assert pravrtti._kala_gate(world, ["orc"])[0] == []              # nobody online: the earliest of all, Oldric's ONE: the orc is past it
+
+
 def _far_world(age_ahead: int):
     """A clocked world, tick 80 (a far tick), the age overdue and `age_ahead` minutes past the player's present; a monk in the abbey,
     far from the hall where the player stands and online."""
@@ -519,6 +572,71 @@ def test_an_age_the_gate_would_let_run_still_takes_the_far_tick_first() -> None:
     assert pravrtti._kala_gate(world, ["age"])[0] == ["age"]
     world.world_data = {}                                                # a world keeping no clock has nothing to hold: the age is never held
     assert pravrtti._age_held(world) is False
+
+
+def _engaged_far_world(guard_held: bool):
+    """`_far_world` with the age held, and the player's own scene given two of the world's own: the guard, who wrote a tuple in the player's last
+    pulse (so the engaged scene's draw is his alone), and the porter, who did not. The guard stands at the player's present, in the scene the
+    player lived to it, so the gate holds him (NPCs follow and never lead); with `guard_held` false the world keeps no clock, so there is no
+    gate and no age, and the engaged scene draws him. All three are kept (a `useful` tuple), so nothing folds them away."""
+    import dataclasses
+    from smritilila.smrti.kala import AGE_LEAD
+    world = _far_world(AGE_LEAD + H)
+    world.world_data["pacing"]["arrivals"] = False                                    # no quiet scene is asked whether anyone came: the engaged scene has the draw
+    if not guard_held:
+        world.world_data.pop("clock")
+        world.bhuvana = None
+    present = ONE + 2 * H
+    for eid in ("guard", "porter"):
+        world.canon.entities[eid] = Entity(eid, [f"the {eid}"], 0, "genesis")
+        world.records.append(Record(f"k_{eid}", "kosha", eid, "hall", 0, "p0", None))
+    world.recent_memories += [_m(3, "guard", "hall", 70, ONE, present), _m(4, "porter", "hall", 20, ONE, ONE + H)]
+    world.recent_memories = [dataclasses.replace(m, use="useful") if m.entity_id in ("monk", "guard", "porter") else m for m in world.recent_memories]
+    return world
+
+
+def test_an_engaged_scene_the_gate_holds_gives_the_draw_to_the_rest_of_the_world() -> None:
+    """Marc, 2026-10-28 ("When we have that kind of block we should redraw the autonomous action instead of skipping"). Stonemarch's far windows at
+    ticks 2536 and 2537 drew nobody: the player (Nagresh) stood in a new scene each pulse, so the cadence never gave the draw away; the engaged
+    scene's only candidate (his companion) stood at the player's present, the gate held him (smrti.world_waits), and nobody else was asked.
+    The engaged scene's draw that leaves nobody is an off-beat: the rest of the world is drawn, the player's scene left out."""
+    world = _engaged_far_world(guard_held=True)
+    assert pravrtti._smrti_exploration_pool(world) == ["guard"]                       # the engaged scene has the draw, alone
+    assert pravrtti._kala_gate(world, ["guard"]) == ([], {})                          # and the gate holds him: before, nobody was drawn
+    rest = pravrtti._smrti_exploration_pool(world, redraw=True)
+    assert "monk" in rest and "guard" not in rest and "porter" not in rest            # the off-beat's pool: the world, the player's scene left out
+    drawn, turns = spanda._draw(world)
+    assert "monk" in drawn and "monk" in turns                                        # the far being has the far tick
+    assert "guard" not in drawn and "porter" not in drawn and "age" not in drawn      # the player's scene keeps its beat; the held age waits as before
+    world.canon.world_time = 82                                                       # not a far tick: no far being has a tick to take
+    drawn, _ = spanda._draw(world)
+    assert "monk" not in drawn and "guard" not in drawn and "porter" not in drawn     # drawn again, and nobody there: nobody
+
+
+def test_an_engaged_scene_that_draws_someone_is_not_drawn_past() -> None:
+    """The redraw is for a draw that left nobody: a guard the gate lets run has the turn, and the far world waits for its own."""
+    world = _engaged_far_world(guard_held=False)
+    drawn, _ = spanda._draw(world)
+    assert drawn == ["guard"]
+
+
+def test_a_redraw_without_an_engaged_scene_changes_nothing() -> None:
+    world = _far_world(0)
+    assert pravrtti._smrti_exploration_pool(world, redraw=True) == pravrtti._smrti_exploration_pool(world)
+
+
+def test_a_redrawn_draw_is_witnessed(monkeypatch) -> None:
+    """smrti.redrawn: what was blocked, how many were left, how many drawn -- so a draw rule is scored on the log."""
+    seen = []
+    monkeypatch.setattr(spanda, "log_event", lambda event, **kw: seen.append((event, kw)))
+    world = _engaged_far_world(guard_held=True)
+    spanda._draw(world)
+    events = [kw for event, kw in seen if event == "smrti.redrawn"]
+    assert len(events) == 1 and events[0]["tick"] == 80 and events[0]["blocked"] == 1
+    assert events[0]["drawn"] >= 1 and events[0]["rest"] >= events[0]["drawn"]
+    seen.clear()
+    spanda._draw(_engaged_far_world(guard_held=False))
+    assert not [event for event, _ in seen if event == "smrti.redrawn"]
 
 
 def test_a_rounds_key_is_the_scene_and_what_a_boundary_joins_to_it() -> None:

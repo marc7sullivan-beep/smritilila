@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smritilila"
-version = "0.1.0"
+version = "0.1.1"
 description = "Persistent multiplayer generative world engine"
 license = "Apache-2.0"          # Marc, 2026-10-17
 license-files = ["LICENSE"]

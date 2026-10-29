@@ -1846,6 +1846,29 @@ def test_a_heartbeat_keeps_a_player_online_but_never_brings_one_back(client: Tes
     assert client.post("/players/player/heartbeat").status_code == 403                     # not their character
 
 
+def test_a_beat_keeps_a_waiting_player_online_and_only_an_action_makes_them_acting(client: TestClient, monkeypatch: pytest.MonkeyPatch,
+                                                                                   fake_store) -> None:
+    """Marc, 2026-10-28 ("Exclude waiting players"): a held bot is online by its beat and posts no action, so the world does not wait on its clock
+    (WorldSession.acting). A beat, or presence said, never makes a player acting; an action does -- the typed one and a round's."""
+    from smritilila.smrti.pulse import SmrtiPulseResult
+    world = _seed_square_world(client)
+    world.autonomous.add("player")
+    world.waiting.add("player")                                                              # left waiting, as a stopped agent is
+    assert client.post("/players/player/presence", json={"online": True}).status_code == 200
+    assert client.post("/players/player/heartbeat").status_code == 204
+    assert world.online("player") and not world.acting("player") and "player" not in world.last_acted
+
+    roles = _fake_roles()
+    roles.smrti_client = object()
+    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(spanda, "run_smrti_pulse", lambda *a, **k: SmrtiPulseResult(
+        narration="n", memories_written=[], new_entities=[], suggested_next_action="", context_tuples=0, bound_ids=[]))
+    monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
+    monkeypatch.setattr(main, "_select_for_activation", lambda *a, **k: None, raising=False)
+    assert client.post("/pulses", json={"action_text": "looks up", "entity_id": "player"}).status_code == 200
+    assert world.acting("player") and "player" in world.last_acted                          # it acted: its clock is a present again
+
+
 def test_a_being_the_world_holds_is_made_playable_and_waits(client: TestClient, fake_store) -> None:
     """Marc, 2026-09-28: Elmo, played by an agent from his own page. Made playable, a being is logged off and
     waiting (v4.58) -- voiced, no turn of its own until touched, and no round waits on it -- until its first presence."""
@@ -2238,6 +2261,7 @@ def test_players_together_act_as_one_round_and_each_is_told_it(
     r = client.post("/pulses", json={"action_text": "I offer my sword.", "entity_id": "mara"}).json()
     assert r["narrations"] == {} and r["round"]["open"] and r["round"]["acted"] and not calls
     assert {m["id"]: m["acted"] for m in r["round"]["members"]} == {"mara": True, "player": False}
+    assert set(world.last_acted) == {"mara"}  # an action into a round is an act (WorldSession.acting), the other's page not yet
     seen = client.get("/rounds/player").json()
     assert seen["open"] and not seen["acted"] and seen["told"] is None
     assert "offer" not in str(seen)  # who has acted, never what
@@ -2431,10 +2455,48 @@ def test_a_perceiver_whose_own_turn_gave_nothing_sleeps_until_touched(client: Te
     world.recent_memories.append(Memory("d2", "dart", frozenset(), "I lay still in the mud.", "PRIMARY", 6, "square", 6, "p6", None, "none"))
     world.canon.world_time = 7
     assert "dart" not in pravrtti._smrti_exploration_pool(world)
-    # handled again: a player's pulse writes it a tuple
-    world.recent_memories.append(Memory("d3", "dart", frozenset(), "A hand pulled me from the mud.", "PRIMARY", 5, "square", 7, "p7", None, "none"))
+    # the room's doings, written to it by a player's pulse (habitual, use none), are not handling (Marc, 2026-10-28)
+    world.recent_memories.append(Memory("d3", "dart", frozenset(), "Boots crossed the square.", "PRIMARY", 6, "square", 7, "p7", None, "none"))
     world.canon.world_time = 8
+    assert "dart" not in pravrtti._smrti_exploration_pool(world)
+    # handled again: a player's pulse writes it a tuple that matters
+    world.recent_memories.append(Memory("d4", "dart", frozenset(), "A hand pulled me from the mud.", "PRIMARY", 5, "square", 8, "p8", None, "useful"))
+    world.canon.world_time = 9
     assert "dart" in pravrtti._smrti_exploration_pool(world)
+
+
+def test_what_wakes_a_sleeper_is_a_tuple_that_matters_or_a_move_and_not_the_rooms_copy(client: TestClient, fake_store) -> None:
+    """Marc, 2026-10-28 ("Build 1"). Stonemarch's 34 probes since the 16:16 restart: each a thing beside Nagresh, woken by the copy of the room that
+    every pulse of a player writes it (`use: none`, habitual), drawn, and writing that cold water dripped. A sleeper (nidrā) is woken by another's
+    pulse only if what it wrote the sleeper is kept (`useful`, `key`) or weighty (salience 3 or heavier), or moved it."""
+    from smritilila.graph.entity import Entity
+    from smritilila.memory.memory import Memory
+    from smritilila.memory.record import Record
+
+    def sleeper(*after, moved=False, own=6):
+        _seed_square_world(client)
+        world = client.app.state.world
+        world.canon.entities["dart"] = Entity("dart", ["a bent dart"], 0, "genesis")
+        world.canon.entities["dart"].last_simulated_tick = 5     # drawn at tick 5: its turn is written at 6
+        world.recent_memories += [Memory("d1", "dart", frozenset(), "I was thrown into the mud.", "PRIMARY", 5, "square", 3, "p3", None),
+                                  Memory("d2", "dart", frozenset(), "I lay still in the mud.", "PRIMARY", own, "square", 6, "p6", None, "none")]
+        if moved:  # carried into the lane at 7; the copies of the room it is given there come after, at 9
+            world.canon.entities["lane"] = Entity("lane", ["the lane"], 0, "genesis", avarana="scene")
+            world.records.append(Record("k1", "kosha", "dart", "lane", 7, "p7", None))
+        for i, (salience, use) in enumerate(after):
+            world.recent_memories.append(Memory(f"c{i}", "dart", frozenset(), f"Something passed {i}.", "PRIMARY", salience, "lane" if moved else "square",
+                                                9 if moved else 7, f"p7-{i}", None, use))
+        world.canon.world_time = 16                                  # a far tick: a being far from the player is drawn too
+        return world
+
+    for after in ((), ((7, "none"),), ((6, "none"), (5, "none"), (4, "none"))):    # nothing, or only the room's copies
+        assert "dart" not in pravrtti._smrti_exploration_pool(sleeper(*after)), after
+    for after in (((3, "none"),), ((1, "none"),), ((6, "useful"),), ((7, "key"),), ((7, "none"), (7, "none"), (3, "none"))):
+        assert "dart" in pravrtti._smrti_exploration_pool(sleeper(*after)), after  # weighty or kept, among copies or alone
+    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper(own=2))            # its own turn is judged by use as before: a weighty mood still sleeps
+    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper((7, "none"), own=1))
+    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper((7, "none")))      # the control of the move: the same copy, nothing moved
+    assert "dart" in pravrtti._smrti_exploration_pool(sleeper((7, "none"), moved=True))
 
 
 def test_a_round_is_those_within_reach_at_the_same_moment(

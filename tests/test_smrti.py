@@ -817,6 +817,72 @@ def test_a_plan_named_only_in_words_is_a_thread_on_a_beings_own_turn(monkeypatch
     assert "THREAD FROM MEMORY: (none)" in client.calls[1][1]
 
 
+def test_a_thread_whose_matter_was_closed_is_ignored_and_the_next_salient_or_key_one_is_found(monkeypatch) -> None:
+    """Stonemarch, 2026-10-28: Nagresh's carnelian signet ring, thrown into the river at t2289, was the second suggestion's thread in 111 of his 222
+    pulses. The thread read only weighty tuples (the ring's two, t2267 and t2281, 'seek it, make good'), never saw the lighter tuple that ended
+    the matter, and read no `closes` record: the Narrator closed the opener (t2177), the thread anchored on the steps. Marc: "Ignore closed threads
+    and find another salient or useful memory. We should be checking for both salience and usefulness." A tuple the Narrator closed is not a
+    ground; a subject the actor's later closing tuple is about is closed up to that tick (a new weighty or key tuple after it opens it again); an
+    anchor is a weighty tuple or a `key` one (a fact the actor will act on, whatever its weight)."""
+    from smritilila.memory.record import Record
+    from smritilila.smrti.log import build_log
+    from smritilila.smrti.pulse import THREAD_RECENT, run_smrti_pulse, thread_from_memory
+    canon = Maya(world_time=60, entities={
+        "house": Entity("house", ["the house"], 0, "genesis", avarana="scene"),
+        "inn": Entity("inn", ["the inn"], 0, "genesis", avarana="scene"),
+        "senator": Entity("senator", ["Quintus Marcius Rufus"], 0, "genesis"),
+        "wife": Entity("wife", ["his wife"], 0, "genesis"),
+        "sela": Entity("sela", ["Sela, a pedlar"], 0, "genesis"),
+        "tam": Entity("tam", ["Tam of the mill"], 0, "genesis"),
+        "ring": Entity("ring", ["a carnelian signet ring"], 0, "genesis"),
+    })
+
+    def m(i, who, t, text, sal, subjects=(), use=None):
+        return Memory(f"m{i}", who, frozenset(subjects), text, "PRIMARY", sal, "house" if who in ("senator", "wife") else "inn", t, f"p{t}", None, use=use)
+
+    def closes(head, closer):
+        return Record(f"c{head}-{closer}", "closes", "senator", str(head), closer, f"p{closer}")
+
+    base = [m(1, "senator", -4, "I swore I would find Sela, the pedlar, whatever it cost.", 3, {"sela"}),   # a seed's tuple: negative ticks are not closed
+            m(2, "senator", 10, "I laid the carnelian signet before the apothecary, who recoiled.", 3, {"ring"}),
+            m(3, "senator", 12, "I turned the carnelian signet over in my hand all night.", 3, {"ring"}),
+            m(4, "senator", 20, "I hurled the carnelian signet into the river and walked away.", 4, (), "useful"),
+            m(5, "ring", 5, "Gloved fingers drew me out.", 5, {"senator"}), m(6, "sela", 3, "He asked me.", 5, {"senator"}),
+            m(7, "tam", 3, "I said little.", 5, {"senator"})]
+    base += [m(10 + i, "senator", 30 + i, f"I talked with my wife, tick {30 + i}.", 5, {"wife"}) for i in range(THREAD_RECENT)]
+    thread = lambda mems, recs=(), **kw: thread_from_memory(canon, mems, "senator", {"wife"}, "house", log=build_log(canon, mems, recs)[0] if recs is not None else None, **kw)
+    # as it was: the ring, from its two weighty tuples
+    assert thread_from_memory(canon, base, "senator", {"wife"}, "house").startswith("ring (a carnelian signet ring) -- [12, weighty]")  # the later of two equal anchors
+    # a closing tuple that is about the ring closes it up to its tick: the next salient one is found
+    assert thread(base, [closes(10, 20)]).startswith("sela (Sela, a pedlar) -- [-4, weighty]")
+    # the Narrator closed only one head, and the closing tuple is not about the ring: the other anchor stands
+    other = base + [m(30, "senator", 21, "I mended the fence.", 5, (), "useful")]
+    assert thread(other, [closes(10, 21)]).startswith("ring (a carnelian signet ring) -- [12, weighty]")
+    assert thread(other, [closes(10, 21), closes(12, 21)]).startswith("sela ")                    # every anchor closed directly: nothing left of the ring
+    # a closing that only lists the ring among what was there closes nothing of the ring's
+    listed = base + [m(33, "senator", 21, "I mended the fence.", 5, {"ring"}, "useful")]
+    assert thread(listed, [closes(10, 21)]).startswith("ring (a carnelian signet ring) -- [12, weighty]")
+    # a weighty tuple after the closing opens it again
+    again = base + [m(31, "senator", 25, "The carnelian signet came up in a fisherman's net.", 3, {"ring"})]
+    assert thread(again, [closes(10, 20)]).startswith("ring (a carnelian signet ring) -- [25, weighty]")
+    # usefulness as well as salience: where nothing salient is left, a `key` tuple of ordinary weight grounds a thread, a merely useful one does not
+    keyed = [x for x in base if x.id not in ("m1", "m2", "m3")] + [m(32, "senator", 8, "Tam told me where the grain was hidden.", 5, {"tam"}, "key")]
+    assert thread(keyed, None).startswith("tam (Tam of the mill) -- [8, ordinary]")
+    assert thread([x for x in base if x.id not in ("m2", "m3")] + keyed[-1:], None).startswith("sela (Sela, a pedlar) -- [-4, weighty]")   # the salient first
+    useful = [x for x in keyed if x.id != "m32"] + [m(32, "senator", 8, "Tam told me where the grain was hidden.", 5, {"tam"}, "useful")]
+    assert thread(useful, None) == ""
+    # a closed key tuple is closed too
+    assert thread(keyed, [closes(8, 20)]) == ""
+    # the line reaches the Narrator on a pulse, the closing from the records: the ring is not offered, Sela is
+    client = _FakeClient({"narration": "x", "perceiver_tuples": [{"perceiver": "senator", "text": "I sat a while longer.", "salience": "passing"}],
+                          "scene_tuples": [{"scene": "house", "text": "The man sat on.", "present": ["senator", "wife"]}], "suggested_next_action": ""})
+    monkeypatch.setattr("smritilila.smrti.pulse.log_event", lambda event, **f: None)
+    run_smrti_pulse(canon, "senator", "sits", 61, "p61", base, client, None, records=[closes(10, 20)])
+    assert "THREAD FROM MEMORY: sela (Sela, a pedlar)" in client.calls[0][1]
+    run_smrti_pulse(canon, "senator", "sits", 62, "p62", base, client, None)
+    assert "THREAD FROM MEMORY: ring (a carnelian signet ring)" in client.calls[1][1]
+
+
 def test_rule_10_an_action_is_an_attempt_and_memory_shapes_the_outcome() -> None:
     """Marc, 2026-09-20: nothing told the Narrator an action might not
     work out. Memory sets the shape of what can follow; within it one

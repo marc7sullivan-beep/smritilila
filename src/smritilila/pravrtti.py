@@ -28,6 +28,18 @@ from smritilila.smrti.kala import chronicle_ids, world_turn
 if TYPE_CHECKING:
     from smritilila.adhisthana import WorldSession
 
+WEIGHTY = 3  # salience 3 or heavier: 1 indelible, 2 marking, 3 weighty (4 notable, 5 ordinary, 6 passing, 7 habitual)
+
+
+def _weighty(m: Memory) -> bool:
+    """Whether a tuple weighs on whoever holds it (salience 3 or heavier), as opposed to the scene seen from where a thing stands (Marc,
+    2026-10-28: "Build 1"). Every pulse of a player writes the things and the dead around them a copy of what the room did, `use: none` and
+    habitual; Stonemarch's 34 probes since the 16:16 restart were each woken by one (21 of the 34 had nothing else in forty ticks), only to
+    write that cold water dripped. A tuple that is neither weighty nor kept (`useful`, `key`: dormancy and absorption each read the use
+    themselves) neither wakes a sleeper (nidrā) nor keeps a candidate from being folded (laya). By the tuple's own weight, which the Narrator
+    wrote, never by kind (s0)."""
+    return m.salience <= WEIGHTY
+
 
 def _age_ahead(world: WorldSession) -> int | None:
     """How far the age's clock stands ahead of the players' latest present: the one question the kāla gate asks of the age (v5 §23), asked here
@@ -47,7 +59,7 @@ def _age_held(world: WorldSession) -> bool:
     return ahead is not None and ahead > int(world.pace()["age_lead"])
 
 
-def _smrti_exploration_pool(world: WorldSession) -> list[str]:
+def _smrti_exploration_pool(world: WorldSession, redraw: bool = False) -> list[str]:
     """v4 (v5 §10-§12, §38): every perceiver who is not a player whose time is their own, drawn by scene.
     Its name: pravṛtti (प्रवृत्ति), activity, the world's own unfolding (v5 §38).
     Where anyone is, is their containment (smrti/kosha.py); near is a
@@ -66,7 +78,11 @@ def _smrti_exploration_pool(world: WorldSession) -> list[str]:
     scene no turn has touched gave nobody anything (spec correction,
     2026-09-23, while building). A scene never asked counts as last asked
     at its latest record, so a converted world is not flooded with every
-    scene's first ask (v5 Part 9's "measured before cutover", stood in)."""
+    scene's first ask (v5 Part 9's "measured before cutover", stood in).
+
+    `redraw` (Marc, 2026-10-28: "When we have that kind of block we should redraw the autonomous action instead of skipping"): the draw
+    as an off-beat, asked for when the engaged scene had it and the filters and the gate left nobody (spanda._draw) -- the rest of the
+    world, the player's scene left out, as the cadence's own off-beat gives it. Without an engaged scene it changes nothing."""
     canon = world.canon
     t = canon.world_time + 1
     pace = world.pace()
@@ -183,9 +199,14 @@ def _smrti_exploration_pool(world: WorldSession) -> list[str]:
     def gave_nothing_itself(eid: str) -> bool:
         """DORMANT (Marc, 2026-09-27; Stonemarch: a bent dart, a barred door,
         a dead spider each drawn to act "on their own"): a perceiver whose own
-        last turn moved nothing, said nothing and gave nothing (every tuple of
-        it `use: none`) is not drawn again until another's pulse writes it a
-        tuple -- handled again, it may act again.
+        last turn moved nothing, said nothing and gave nothing is not drawn
+        again until another's pulse writes it a tuple that is kept (`useful`, `key`)
+        or weighty (`_weighty`) -- handled again, it may act again. A copy of the
+        room's doings that a player's pulse writes it (`use: none`, habitual)
+        is not handling (Marc, 2026-10-28: "Build 1"); before, any tuple of
+        another pulse woke it. Its own turn is judged as before, by `use`
+        alone (a turn is written the tick after it is drawn, `since` + 1):
+        a weighty tuple with `use: none` is mood, and slept.
         Its name: nidrā (निद्रा), sleep (v5 §38).
         As a quiet scene sleeps (v5 §38), by structure: the engine cannot tell a dart from a gnoll, and
         does not try. Cost: the candidate's own memories since its last turn."""
@@ -197,13 +218,12 @@ def _smrti_exploration_pool(world: WorldSession) -> list[str]:
             if m.world_time <= since:
                 break
             own.append(m)
-        if not own or len({m.pulse_id for m in own}) > 1:
-            return False  # its turn wrote nothing, or someone has touched it since
-        if any((m.use or "none") != "none" for m in own):
-            return False
-        turn = own[0].world_time
-        if kosha.container_at(eid, turn) != kosha.container_at(eid, turn + 1):
-            return False  # it moved
+        if not own:
+            return False  # its turn wrote nothing
+        if any((m.use or "none") != "none" or (m.world_time > since + 1 and _weighty(m)) for m in own):
+            return False  # its turn gave something, or after it another's pulse gave it something to mind
+        if kosha.container_at(eid, since + 1) != kosha.container_at(eid, canon.world_time + 1):
+            return False  # it moved, its own turn or another's
         return not any((kosha.said.get((m.location_id, m.pulse_id)) or ("", None))[1] == eid for m in own)
 
     def touched_while_waiting(eid: str) -> bool:
@@ -263,8 +283,10 @@ def _smrti_exploration_pool(world: WorldSession) -> list[str]:
         # every second player pulse in a scene, not every one.
         last_draw = world.scene_draws.get(here)
         since = sum(1 for m in mem.player_pulses_after(last_draw) if where(m.location_id) == here) if last_draw is not None else None
-        if engaged and since is not None and since < pace["scene_cadence"] and last_player.world_time != last_draw:
-            log_event("smrti.scene_waits", place=here, tick=last_player.world_time, engaged=engaged, last_draw=last_draw, pulses_since=since)
+        waits = bool(engaged and since is not None and since < pace["scene_cadence"] and last_player.world_time != last_draw)
+        if engaged and (waits or redraw):
+            if waits:
+                log_event("smrti.scene_waits", place=here, tick=last_player.world_time, engaged=engaged, last_draw=last_draw, pulses_since=since)
             in_scene = {eid for eid in pool if scene(eid) == here}
             return [e for e in pool + arrivals if e not in in_scene and e != here]
         if engaged:
@@ -338,9 +360,9 @@ ABSORBED_QUIET_TICKS = 40  # absorption: quiet is nothing of one's own -- tuple,
 
 def _fold_absorbed(world: WorldSession, pool: list[str]) -> list[str]:
     """Absorption (b) in the draw (Marc, 2026-09-29): a candidate is folded into its container -- not drawn on its own;
-    its container's turn carries it -- when it is QUIET (no tuple of its own, no move, no mention in the last
-    ABSORBED_QUIET_TICKS ticks) and has NEVER KEPT anything (no memory of its own, from anyone's pulse, ever kept
-    useful or key).
+    its container's turn carries it -- when it is QUIET (no tuple of its own that is weighty (`_weighty`; the room's
+    habitual copy a player's pulse writes it does not count), no move, no mention in the last ABSORBED_QUIET_TICKS ticks) and has
+    NEVER KEPT anything (no memory of its own, from anyone's pulse, ever kept useful or key).
     Its name: laya (लय), dissolution back into one's source (v5 §38).
     By what it has done, never by kind (s0): whoever has kept a memory -- Jaroo, Rannulf -- is drawn
     as before, and whatever is folded wakes as itself the moment a player or a telling touches it. Replayed on
@@ -352,7 +374,7 @@ def _fold_absorbed(world: WorldSession, pool: list[str]) -> list[str]:
     if not pool:
         return pool
     since = world.canon.world_time - ABSORBED_QUIET_TICKS
-    active = {m.entity_id for m in world.recent_memories if m.world_time >= since}
+    active = {m.entity_id for m in world.recent_memories if m.world_time >= since and _weighty(m)}
     active |= {r.entity_id for r in world.records if r.kind == "kosha" and r.world_time >= since}
     said = " | ".join(m.experience.lower() for m in world.recent_memories if m.world_time >= since and m.experience)
     by_entity = world.samskara().mem.by_entity
@@ -390,8 +412,10 @@ def _kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[st
     candidate at or past its reference -- the EARLIEST clock among the
     players whose time is their own (online, or offline and not allowing
     the world to act for them: v4.31) in or next to its scene, else the
-    world's present, the earliest clock among online players (among all
-    players in the world, if none is online) -- is not drawn; of the rest,
+    world's present, the earliest clock among the acting players -- online,
+    and not waiting unless they have acted lately (WorldSession.acting:
+    a held bot's beat is not a turn, v5.59); among the online if none
+    is acting, among all players in the world if none is online -- is not drawn; of the rest,
     those within 30 minutes of the oldest clock are, the oldest clocks
     first, each capped to end by its reference -- and, in its
     own scene, to begin after and end before what someone already lived
@@ -407,10 +431,11 @@ def _kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[st
     t = world.canon.world_time + 1
     here = [p for p in world.playable_entity_ids if p not in world.absent()]
     online = [p for p in here if world.online(p)]
+    acting = [p for p in here if world.acting(p)]
     if not here:
         return pool, turns
     clocks = {p: kala.now(p) for p in here}
-    present = min(clocks[p] for p in (online or here))  # nobody online: the world still waits for its players
+    present = min(clocks[p] for p in (acting or online or here))  # nobody acting: the beat's players; nobody online: the world still waits for its players
     # v5 §23 v4.31: every span stops at the first present it touches -- a world turn too. A player whose time is
     # their own bounds the turns near them whether online or not; one who lets the world act for them while
     # away (v5 §37) is carried. Ravenmoor's parlour ran 1507 -> 1534 past an offline player standing in it at 1500.

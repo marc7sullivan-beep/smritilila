@@ -326,7 +326,7 @@ THREAD_RECENT = 15  # the actor's last own tuples: whoever is in them has been "
 
 
 def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, present: set[str], here: str | None,
-                       kosha=None, named: bool = False) -> str:
+                       kosha=None, named: bool = False, log=None) -> str:
     """The second suggestion's ground, chosen by the engine (2026-09-21):
     the PERSON the actor's weightier own tuples are most about, who is not
     here and not in the actor's last THREAD_RECENT tuples; else such a
@@ -334,7 +334,15 @@ def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, p
 
     `named` (2026-10-27): a tuple is also about whom it names in its words, not only whom it lists. Asked on a being's own turn, where the
     thread is the matter of their own they have been leaving; a player's second suggestion is as it was until that is replayed (it moves
-    7 of 10 players' threads in Stonemarch, some from a place to a person)."""
+    7 of 10 players' threads in Stonemarch, some from a place to a person).
+
+    `log` (2026-10-28; Marc: "Ignore closed threads and find another salient or useful memory. We should be checking for both salience and
+    usefulness"): the Narrator's own closings (`closes`, v5.33) and a tuple's use. The ground of a thread is a tuple that is weighty (salience 3
+    or heavier) or, where nothing salient is left, `key` (a fact the actor will act on, §3), and not closed: a tuple a later tuple of the actor's
+    closes is over, and a subject the actor's later CLOSING tuple names in its words is closed up to that tick (a new ground after it opens it
+    again). Nagresh's carnelian ring, hurled into the river at t2289, was his thread in 111 of 222 pulses: its two weighty tuples were all the
+    thread saw; the lighter tuple that ended it, and the closing written on that tuple (it cited the opener), it did not read. Without a `log`
+    nothing is closed."""
     from smritilila.smrti.narrator import SALIENCE_NAMES
     memories = list(memories)
     has_stream = {m.entity_id for m in memories}
@@ -357,11 +365,37 @@ def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, p
     # of "the tin peddler off the hill roads" (replay, 28 of 60 threads moved)
     rare = rare_words([e.labels[0] for e in canon.entities.values() if e.labels])
 
+    def told(key: str, m: Memory) -> bool:
+        return bool(names.names_in(m.experience, [key])) or bool(tokens(canon.entities[key].labels[0]) & rare & tokens(m.experience))
+
+    use_keys = False
+
+    def strength(m: Memory) -> int:
+        """How hard a tuple holds the actor: its weight (weighty 1, marking 2, indelible 3) and, once the salient have been looked through, 1 for a
+        `key` tuple whatever its weight. 0: not a ground."""
+        return max(4 - m.salience, 1 if use_keys and m.use == "key" else 0)
+
+    closed_by = getattr(log, "_closed_by", None) or {}
+    closing = getattr(log, "_closes", None) or {}
+    closers = [m for m in own if closing.get((actor_id, m.world_time))]   # the actor's tuples that close an earlier one of theirs
+    closed_up_to: dict[str, int] = {}
+
+    def closed(m: Memory) -> bool:
+        """A later tuple of the actor's closes this one: the matter it opened is over."""
+        return bool(closed_by.get((actor_id, m.world_time)))
+
+    def over(key: str, m: Memory) -> bool:
+        """The actor's latest closing tuple that names `key` is at or after this one: whatever it opened about them has ended since. A closing
+        tuple that only lists them among who was there closes nothing of theirs."""
+        if key not in closed_up_to:
+            closed_up_to[key] = max((c.world_time for c in closers if told(key, c)), default=None)   # None: never closed (a seed's tuples stand at negative ticks)
+        return closed_up_to[key] is not None and m.world_time <= closed_up_to[key]
+
     def note(key: str, m: Memory, need_words: bool = False) -> None:
-        words = bool(names.names_in(m.experience, [key])) or bool(tokens(canon.entities[key].labels[0]) & rare & tokens(m.experience))
+        words = told(key, m)
         if need_words and not words:
             return
-        score[key] = score.get(key, 0.0) + (4 - m.salience) * (2 if words else 1)
+        score[key] = score.get(key, 0.0) + strength(m) * (2 if words else 1)
         rank = (0 if words else 1, m.salience, -m.world_time, m)
         if key not in anchor or rank[:3] < anchor[key][:3]:
             anchor[key] = rank
@@ -371,21 +405,26 @@ def thread_from_memory(canon: Maya, memories: Iterable[Memory], actor_id: str, p
     # water priest's captives, the earth priest's scheme against him -- was in prose only, and the thread could not find it (Stonemarch,
     # 2026-10-27). `names_in` is exact and keyed by the text's words, and runs on the few weighty tuples, not the stream.
     among = has_stream - {actor_id}
-    for m in older:
-        if m.salience > 3:
-            continue
-        for p in set(m.subject_ids) | (set(names.names_in(m.experience, among)) if named else set()):
-            e = canon.entities.get(p)
-            if p == actor_id or p in lately or p not in has_stream or e is None or names.is_scene(p) or not e.labels:
-                continue
-            note(p, m, need_words=True)
-    if not score:
+    for use_keys in (False, True):   # the salient first; the useful (`key`) only where nothing salient is left to ground a thread
         for m in older:
-            where = v3_enclosure(canon, m.location_id, enclosure)
-            e = canon.entities.get(where) if where else None
-            if m.salience > 3 or where in lately_places or e is None or not e.labels or (m.subject_ids & set(present)):
+            if strength(m) == 0 or closed(m):
                 continue
-            note(where, m)
+            for p in set(m.subject_ids) | (set(names.names_in(m.experience, among)) if named else set()):
+                e = canon.entities.get(p)
+                if p == actor_id or p in lately or p not in has_stream or e is None or names.is_scene(p) or not e.labels:
+                    continue
+                if over(p, m):
+                    continue
+                note(p, m, need_words=True)
+        if not score:
+            for m in older:
+                where = v3_enclosure(canon, m.location_id, enclosure)
+                e = canon.entities.get(where) if where else None
+                if strength(m) == 0 or closed(m) or where in lately_places or e is None or not e.labels or (m.subject_ids & set(present)):
+                    continue
+                note(where, m)
+        if score:
+            break
     if not score:
         return ""
     # the id last: an exact tie was decided by hash order, and the second suggestion differed from one server
@@ -1987,7 +2026,7 @@ def run_smrti_pulse(
     # the thread is the matter of their own a being has been leaving: on a player's pulse it grounds the second suggestion; on a being's own turn
     # (no action, not a quiet scene's ask, not the age's) it is what the being may set about (rule A). Before 2026-10-27 only the first.
     own_turn = action_text is None and not as_origin and as_chronicle is None
-    thread = thread_from_memory(canon, memories, actor_id, ctx.present, ctx.place, log.kosha, named=own_turn) if (action_text is not None or own_turn) else ""
+    thread = thread_from_memory(canon, memories, actor_id, ctx.present, ctx.place, log.kosha, named=own_turn, log=log) if (action_text is not None or own_turn) else ""
     if thread:
         log_event("smrti.thread", pulse_id=pulse_id, actor=actor_id, thread=thread[:120])
     own_words = {}
