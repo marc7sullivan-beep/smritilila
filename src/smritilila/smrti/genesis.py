@@ -57,7 +57,7 @@ def plant_chronicle(bhuvana: str, embed) -> tuple[Entity, Memory, Record]:
 
 
 def plant_person(label: str, tuples: list, place: str, now: int, pulse_id: str, embed, *, eid: str | None = None,
-                 backdate: bool = False, minute: int | None = None) -> tuple[Entity, list[Memory], Record]:
+                 backdate: bool = False, minute: int | None = None, birth: list | None = None) -> tuple[Entity, list[Memory], Record]:
     """A person planted with their first tuples, standing in `place` -- one
     way for genesis, an expansion and a newcomer's arrival. `tuples`: plain
     strings (an authored seed: the last weightier) or {"text", "weight"}
@@ -66,9 +66,14 @@ def plant_person(label: str, tuples: list, place: str, now: int, pulse_id: str, 
     tuples run up to now (-20, -10, 0), before anything; in a live world
     they are all at `now`, in order, never on ticks others have lived.
     `minute`: kāla -- where the person's time starts (v5 §20, Marc 2026-09-25:
-    a newcomer joins at the current time of the place they start in)."""
+    a newcomer joins at the current time of the place they start in).
+    `birth`: their birth memory (bija.write_birth; Marc, 2026-11-06: every
+    first memory is preceded by one) as {"text", "weight", "use"} -- planted
+    first, ids and ticks sorting before the first tuple's, as ordinary tuples
+    with a weight and a use of their own: nothing marks them."""
     eid = eid or mnemonic_id(label, new_id())
     person = Entity(eid, [label], now, "genesis")
+    tuples = list(birth or []) + list(tuples)
     n = len(tuples)
     prefix = new_id()[:24]  # ids that sort in order within one tick (the store reads by tick, then id)
     memories = []
@@ -186,11 +191,12 @@ def settle(laws: dict[str, str], places: dict[str, dict]) -> dict[str, str]:
 
 
 def plant_more(new: dict, known_place_ids: dict[str, str], embed, world_time: int, pulse_id: str = "vistara",
-               earth: str | None = None) -> tuple[list[Entity], list[Memory], list[Record]]:
+               earth: str | None = None, births: dict[str, list] | None = None) -> tuple[list[Entity], list[Memory], list[Record]]:
     """Vistāra: plant an expansion into a world that exists. New places
     and people get opaque ids; a person may stand in a known place (by
     the key the Narrator was shown) or a new one. First tuples land at
-    the world's clock: a place's at now, a person's at now, in order."""
+    the world's clock: a place's at now, a person's at now, in order.
+    `births`: {person key: birth memory} (bija.write_births), planted first."""
     ids: dict[str, str] = dict(known_place_ids)
     entities: list[Entity] = []
     memories: list[Memory] = []
@@ -204,7 +210,8 @@ def plant_more(new: dict, known_place_ids: dict[str, str], embed, world_time: in
         placed += [Record(new_id(), "kosha", e.id, earth, world_time, pulse_id, note="earth") for e in entities if not e.kosha]
     for key, person in new["people"].items():
         ids[key] = mnemonic_id(person["label"], new_id())
-        e, mems, rec = plant_person(person["label"], person["tuples"], ids[person["place"]], world_time, pulse_id, embed, eid=ids[key])
+        e, mems, rec = plant_person(person["label"], person["tuples"], ids[person["place"]], world_time, pulse_id, embed, eid=ids[key],
+                                    birth=(births or {}).get(key))
         entities.append(e)
         memories += mems
         placed.append(rec)
@@ -214,12 +221,13 @@ def plant_more(new: dict, known_place_ids: dict[str, str], embed, world_time: in
                                 + prakriti_records(new["places"], ids, world_time, pulse_id))
 
 
-def build(spec: dict, embed, bhuvana: str | None = None) -> tuple[list[Entity], list[Memory], dict]:
+def build(spec: dict, embed, bhuvana: str | None = None, births: dict[str, list] | None = None) -> tuple[list[Entity], list[Memory], dict]:
     """Entities and first tuples from a world spec. Ids are opaque to the
     Narrator by contract but copyable (pulse.py's mnemonic_id: the label's
     words plus a short tail -- 2026-09-21, until then the whole genesis
     cast was 32-hex and the boundary handle map had to cover for it);
-    the spec's own keys are only for cross-reference inside the file."""
+    the spec's own keys are only for cross-reference inside the file.
+    `births`: {person key: birth memory} (bija.write_births), planted first."""
     ids: dict[str, str] = {}
     entities: list[Entity] = []
     memories: list[Memory] = []
@@ -236,7 +244,7 @@ def build(spec: dict, embed, bhuvana: str | None = None) -> tuple[list[Entity], 
         ids[key] = mnemonic_id(person["label"], new_id())
         # the last first-tuple is "now" (tick 0); a plain string takes an authored seed's weights (the last weightier)
         e, mems, rec = plant_person(person["label"], person["tuples"], ids[person["place"]], 0, "genesis", embed,
-                                    eid=ids[key], backdate=True)
+                                    eid=ids[key], backdate=True, birth=(births or {}).get(key))
         entities.append(e)
         memories += mems
         placed.append(rec)

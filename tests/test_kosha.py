@@ -517,9 +517,9 @@ def test_a_new_scene_is_not_asked_whether_anyone_came_the_tick_it_is_minted() ->
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.recent_memories = [_mem(1, "teo", 468, "I walked the track.", "track")]
     world.records = [_rec(1, "overhang", "track", 467)]
-    assert "overhang" not in pravrtti._smrti_exploration_pool(world)
+    assert "overhang" not in pravrtti.smrti_exploration_pool(world)
     canon.world_time = 480
-    assert "overhang" in pravrtti._smrti_exploration_pool(world)
+    assert "overhang" in pravrtti.smrti_exploration_pool(world)
 
 
 def test_a_place_declared_by_the_same_name_in_the_same_container_is_the_one_there(monkeypatch) -> None:
@@ -893,7 +893,7 @@ def test_a_quiet_scene_is_asked_who_came_only_if_someone_could_have(monkeypatch)
                                  _mem(2, "teo", 5, "I crossed the yard.", "yard"),
                                  _mem(3, "drover", 5, "I drove through the lane.", "lane")]
         world.records = [_rec(1, "teo", "green", 0), _rec(2, "drover", "lane", 0), *records]
-        return pravrtti._smrti_exploration_pool(world)
+        return pravrtti.smrti_exploration_pool(world)
     assert "yard" not in pool([]) and any(e == "smrti.nobody_near" for e, _ in events)  # nobody could have come
     assert "yard" in pool([_rec(3, "drover", "yard", 25)])                 # the drover left the lane for the yard
     assert "yard" in pool([_rec(3, "drover", None, 25)])                   # ... or for nowhere recorded
@@ -920,13 +920,13 @@ def test_a_worlds_view_is_read_and_set_whole_and_a_closed_world_is_never_asked_w
     client = TestClient(main.app)
     client.app.state.world = world
     try:
-        assert "yard" in pravrtti._smrti_exploration_pool(world)
+        assert "yard" in pravrtti.smrti_exploration_pool(world)
         r = client.put("/world/view", json={"darsana": "  An island; no one comes.  ", "becomings": {"the_sight": "sees the drowned", "x": " "},
                                             "world_data": {"pacing": {"arrivals": False}}})
         assert r.status_code == 200 and r.json()["darsana"] == "An island; no one comes."
         assert r.json()["becomings"] == {"the_sight": "sees the drowned"} and saved["v"][0] == "An island; no one comes."
         assert client.get("/world/view").json()["world_data"] == {"pacing": {"arrivals": False}}
-        assert "yard" not in pravrtti._smrti_exploration_pool(world)
+        assert "yard" not in pravrtti.smrti_exploration_pool(world)
     finally:
         del client.app.state.world
 
@@ -2309,21 +2309,21 @@ def test_a_quiet_thing_that_never_kept_a_memory_is_folded_out_of_the_draw() -> N
                              _mem(2, "jaroo", 391, "I taught the scholar the old herbs.", "lair", use="key"),
                              _mem(3, "teo", 495, "I walked the road.", "lair")]
     world.records = [_rec(1, "chest", "lair", 360), _rec(2, "jaroo", "lair", 0)]
-    assert pravrtti._fold_absorbed(world, ["chest", "jaroo"]) == ["jaroo"]
+    assert pravrtti.fold_absorbed(world, ["chest", "jaroo"]) == ["jaroo"]
     world.recent_memories.append(_mem(4, "teo", 499, "I looked at an iron-banded chest.", "lair"))
-    assert pravrtti._fold_absorbed(world, ["chest", "jaroo"]) == ["chest", "jaroo"]  # mentioned lately: awake
+    assert pravrtti.fold_absorbed(world, ["chest", "jaroo"]) == ["chest", "jaroo"]  # mentioned lately: awake
     canon.world_time = 400  # within the window of its own last tuple, which matters (weighty): not quiet
     world.recent_memories = world.recent_memories[:3]
     world.recent_memories[0] = dataclasses.replace(world.recent_memories[0], salience=3)
-    assert "chest" in pravrtti._fold_absorbed(world, ["chest", "jaroo"])
+    assert "chest" in pravrtti.fold_absorbed(world, ["chest", "jaroo"])
     world.recent_memories[0] = dataclasses.replace(world.recent_memories[0], salience=4)  # notable only: the same tuple no longer wakes it
     canon.world_time = 401                                                                   # (and its own placing at 360 is out of the window)
-    assert "chest" not in pravrtti._fold_absorbed(world, ["chest", "jaroo"])
+    assert "chest" not in pravrtti.fold_absorbed(world, ["chest", "jaroo"])
     # the world at large is the age's chronicler: never kept, never folded (Stonemarch t521 folded it)
     canon.world_time = 500
     canon.entities["age"] = Entity("age", ["the world at large"], 0, "itihasa")
     world.recent_memories.append(_mem(9, "age", 300, "The season turned in the Viscounty.", "age", use="none"))
-    assert "age" in pravrtti._fold_absorbed(world, ["chest", "age"]) and "chest" not in pravrtti._fold_absorbed(world, ["chest", "age"])
+    assert "age" in pravrtti.fold_absorbed(world, ["chest", "age"]) and "chest" not in pravrtti.fold_absorbed(world, ["chest", "age"])
 
 
 def test_a_copy_of_the_rooms_doings_does_not_keep_a_never_kept_thing_awake() -> None:
@@ -2340,20 +2340,20 @@ def test_a_copy_of_the_rooms_doings_does_not_keep_a_never_kept_thing_awake() -> 
     copy = dataclasses.replace(_mem(5, "chest", 495, "Boots crossed the floor above me.", "lair", use="none"), salience=7)
     world.recent_memories = [_mem(1, "chest", 371, "Hands pried at my hasp.", "lair", use="none"), _mem(3, "teo", 495, "I walked the road.", "lair"), copy]
     world.records = [_rec(1, "chest", "lair", 360)]
-    assert pravrtti._fold_absorbed(world, ["chest"]) == []                                            # the copy of the room: folded, not drawn
+    assert pravrtti.fold_absorbed(world, ["chest"]) == []                                            # the copy of the room: folded, not drawn
     for salience, use, text in ((5, "none", "A lamp swung over me."), (4, "none", "Dust shook from the beams.")):
         world.recent_memories[2] = dataclasses.replace(copy, salience=salience, use=use, experience=text)
-        assert pravrtti._fold_absorbed(world, ["chest"]) == [], (salience, use)                       # ordinary or notable: still the room
+        assert pravrtti.fold_absorbed(world, ["chest"]) == [], (salience, use)                       # ordinary or notable: still the room
     for salience, use, text in ((3, "none", "An axe bit my lid."), (1, "none", "I was split in two."), (6, "useful", "A key was turned in my lock."),
                                 (7, "key", "The ledger was hidden in me.")):
         world.recent_memories[2] = dataclasses.replace(copy, salience=salience, use=use, experience=text)
-        assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"], (salience, use)                # weighty or kept: it was handled
+        assert pravrtti.fold_absorbed(world, ["chest"]) == ["chest"], (salience, use)                # weighty or kept: it was handled
     world.recent_memories[2] = copy
     world.recent_memories.append(_mem(6, "teo", 499, "I looked at an iron-banded chest.", "lair"))      # a mention still wakes
-    assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"]
+    assert pravrtti.fold_absorbed(world, ["chest"]) == ["chest"]
     world.recent_memories.pop()
     world.records.append(_rec(2, "chest", "lair", 480))                                                  # a move is activity, as before
-    assert pravrtti._fold_absorbed(world, ["chest"]) == ["chest"]
+    assert pravrtti.fold_absorbed(world, ["chest"]) == ["chest"]
 
 
 def test_those_with_the_actor_lately_and_not_here_now_are_shown() -> None:
@@ -2732,7 +2732,7 @@ def test_a_chain_held_one_inside_the_next_is_read_in_order_and_is_otherwise_quie
     one inside the next are read in order -- named, the words of every leaf not yet read are shown; a leaf a pulse of
     the reader's wrote to is read; reading on, the rest; otherwise the leaves are quiet, their words in no prompt."""
     from smritilila.smrti.context import read_chains
-    from smritilila.smrti.pulse import _context_for
+    from smritilila.smrti.pulse import context_for
     from smritilila.smrti.samskara import Samskara
     canon = _crossing()
     canon.entities["satchel"] = Entity("satchel", ["a waxed satchel"], 0, "genesis")
@@ -2745,7 +2745,7 @@ def test_a_chain_held_one_inside_the_next_is_read_in_order_and_is_otherwise_quie
 
     def prompt_words(memories, action, now):
         sk = Samskara.build(canon, memories, recs, players=["teo"], clock=None, defaults=None)
-        ctx = _context_for(canon, sk.log_for(canon), "teo", action, now, None, keep=frozenset({"teo"}))
+        ctx = context_for(canon, sk.log_for(canon), "teo", action, now, None, keep=frozenset({"teo"}))
         text = "\n".join(t.memory for t in ctx.tuples)
         return [i for i in (1, 2, 3) if words[i] in text], ctx.reading
 

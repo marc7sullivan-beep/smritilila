@@ -16,12 +16,15 @@ Two implementations:
 from __future__ import annotations
 
 import os
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Protocol, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from smritilila.graph.canon import Maya
 from smritilila.graph.entity import Entity
+from smritilila.memory.chitra import Chitra
 from smritilila.memory.memory import Memory
 from smritilila.memory.record import Record
 from smritilila.persistence.engine import make_engine, make_session_factory
@@ -38,7 +41,10 @@ from smritilila.persistence.repository import (
     load_view,
     load_bhuvana,
     load_canon,
+    load_chitra_data,
+    load_chitra_index,
     load_last_memory,
+    save_chitra,
     load_session_config,
     save_autonomy,
     save_logged_off,
@@ -160,6 +166,18 @@ class WorldStore(Protocol):
         """v4: every containment, name and action record, oldest first."""
         ...
 
+    async def save_chitra(self, c: Chitra) -> Chitra:
+        """Citra (2026-11-11): keep a picture, insert-only; returned as kept (its `seq` and `made_at` are the store's)."""
+        ...
+
+    async def load_chitra_index(self) -> list[Chitra]:
+        """Every picture the world keeps, in the order kept, without their bytes."""
+        ...
+
+    async def load_chitra_data(self, picture_id: str) -> tuple[str, bytes] | None:
+        """One picture's (media type, bytes), or None."""
+        ...
+
 
 class InMemoryWorldStore:
     def __init__(self) -> None:
@@ -239,6 +257,19 @@ class InMemoryWorldStore:
 
     async def load_records(self) -> list[Record]:
         return []
+
+    async def save_chitra(self, c: Chitra) -> Chitra:
+        pictures = self.__dict__.setdefault("_pictures", [])
+        kept = replace(c, seq=len(pictures) + 1, made_at=datetime.now(timezone.utc), size=len(c.data or b""))
+        pictures.append(kept)
+        return replace(kept, data=None)
+
+    async def load_chitra_index(self) -> list[Chitra]:
+        return [replace(c, data=None) for c in getattr(self, "_pictures", [])]
+
+    async def load_chitra_data(self, picture_id: str) -> tuple[str, bytes] | None:
+        c = next((c for c in getattr(self, "_pictures", []) if c.id == picture_id), None)
+        return (c.mime, c.data) if c is not None and c.data else None
 
 
 class PostgresWorldStore:
@@ -363,6 +394,20 @@ class PostgresWorldStore:
     async def load_records(self) -> list[Record]:
         async with self._session_factory() as session:
             return await load_all_records(session)
+
+    async def save_chitra(self, c: Chitra) -> Chitra:
+        async with self._session_factory() as session:
+            kept = await save_chitra(session, c)
+            await session.commit()
+            return kept
+
+    async def load_chitra_index(self) -> list[Chitra]:
+        async with self._session_factory() as session:
+            return await load_chitra_index(session)
+
+    async def load_chitra_data(self, picture_id: str) -> tuple[str, bytes] | None:
+        async with self._session_factory() as session:
+            return await load_chitra_data(session, picture_id)
 
 
 _engines_by_url: dict[str, AsyncEngine] = {}

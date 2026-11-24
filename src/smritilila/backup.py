@@ -30,7 +30,7 @@ and smritilila.nidhi seals them for a cloud-synced folder. Git-ignored: these ar
 not source, and don't belong in the code backup repo.
 
 Two callers, same function (it is also called, with their own `reason`, before a
-migration -- adhisthana._bring_to_head -- by POST /worlds/{name}/backup in routes/loka.py,
+migration -- adhisthana.bring_to_head -- by POST /worlds/{name}/backup in routes/loka.py,
 and before a plant in routes/pratistha.py):
   - routes/loka.py's clear_world (POST /world/clear) calls backup_world for
     whichever world is currently active, BEFORE wiping it -- refuses to
@@ -69,18 +69,18 @@ BACKUPS_DIR = data_dir() / "backups"
 KEEP_PER_WORLD = 30
 
 
-def _pg_dump_path() -> str:
+def pg_dump_path() -> str:
     return os.environ.get("PG_DUMP_PATH") or shutil.which("pg_dump") or r"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"
 
 
-def _pg_dump_url(database_url: str) -> str:
+def pg_dump_url(database_url: str) -> str:
     """pg_dump wants a plain postgresql:// DSN -- SQLAlchemy's own
     +asyncpg driver suffix (smritilila.persistence.engine's own convention)
     means nothing to it."""
     return re.sub(r"^postgresql\+\w+://", "postgresql://", database_url)
 
 
-def _safe_dirname(name: str) -> str:
+def safe_dirname(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", name) or "world"
 
 
@@ -96,12 +96,12 @@ def backup_world(entry: WorldRegistryEntry, *, reason: str = "scheduled", backup
     Raises CalledProcessError if pg_dump itself fails -- a caller
     backing up before a destructive operation (clear_world) must let
     this propagate and abort, not proceed with no safety net."""
-    world_dir = backups_dir / _safe_dirname(entry.name)
+    world_dir = backups_dir / safe_dirname(entry.name)
     world_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    dest = world_dir / f"{_safe_dirname(entry.name)}_{timestamp}_{reason}.dump"
+    dest = world_dir / f"{safe_dirname(entry.name)}_{timestamp}_{reason}.dump"
     _run_hidden(
-        [_pg_dump_path(), "-Fc", "-f", str(dest), _pg_dump_url(entry.database_url)],
+        [pg_dump_path(), "-Fc", "-f", str(dest), pg_dump_url(entry.database_url)],
         check=True, capture_output=True, text=True,
     )
     _prune_old_backups(world_dir)

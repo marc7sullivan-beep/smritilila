@@ -23,15 +23,16 @@ from fastapi import APIRouter, HTTPException, Request
 from smritilila.graph.canon import Maya
 from smritilila.ids import new_id
 from smritilila import adhisthana  # the services, called through it so a test's patch there reaches them
-from smritilila.adhisthana import WorldSession, _store, _stream_of, app
+from smritilila.adhisthana import WorldSession, store_of, stream_of, app
 from smritilila.memory.record import Record
 from smritilila.paths import data_dir
 from smritilila.sakshi import current_world, log_event
 from smritilila.world_store import PostgresWorldStore
 from smritilila.schemas import ManacitraRequest, PratisthaRequest, ProposalOut
-from smritilila.routes import spanda  # its routes, and the names a test patches there, called through it
-from smritilila.routes.bija import _seeder
+from smritilila import spanda  # the pulse's services, and the names a test patches there, called through it
 import json as _json  # the proposals are JSON files
+from smritilila import paths  # MAPS_DIR, read through it so a test's replacement there reaches it
+from smritilila import udbhava  # who writes a seed (seeder), called through it so a test's patch there reaches it
 
 
 router = APIRouter()
@@ -84,8 +85,8 @@ def _touches_secret(world: "WorldSession", *parts: object) -> bool:
 
 
 def _proposals_dir(world: "WorldSession") -> Path:
-    from smritilila.backup import _safe_dirname
-    d = PROPOSALS_DIR / _safe_dirname(world.name or current_world() or "world")
+    from smritilila.backup import safe_dirname
+    d = PROPOSALS_DIR / safe_dirname(world.name or current_world() or "world")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -125,9 +126,26 @@ def _builder_view(world: "WorldSession") -> str:
     lived = [f"[{m.world_time}, {m.entity_id}] {m.experience[:220]}" for m in world.recent_memories[-LIVED_WINDOW:]]
     threads = []
     for pid in world.playable_entity_ids:
-        own = _stream_of(world, pid)[-4:]
+        own = stream_of(world, pid)[-4:]
         threads += [f"[{pid}] {m.experience[:220]}" for m in own]
     return world_view(world.world_data.get("source"), world.bhuvana, places, people, lived, threads)
+
+
+async def _give_births(world: "WorldSession", roles, spec: dict) -> dict:
+    """A birth memory for each person of a written seed (smrti/pratistha.py give_births; Marc, 2026-11-06), before it is checked and proved:
+    the proposal carries them, so the god who reviews it reads them. Never fails the proposal."""
+    from smritilila.smrti.pratistha import give_births
+    keys = {str(r.get("key")): str(r.get("label")) for r in spec.get("places") or [] if isinstance(r, dict) and r.get("key") and r.get("label")}
+
+    def place_label(x: str) -> str:
+        e = world.canon.entities.get(x)
+        return keys.get(x) or (e.labels[0] if e and e.labels else x)
+    try:
+        return await asyncio.to_thread(give_births, roles.smrti_client, spec, place_label, world.bhuvana, world.darsana,
+                                       (world.world_data or {}).get("source"))
+    except Exception as exc:  # noqa: BLE001 -- a proposal without births is still a proposal
+        log_event("pratistha.births_failed", error=str(exc)[:200])
+        return spec
 
 
 async def _check_and_prove(world: "WorldSession", spec: dict) -> tuple[list[str], list[str], dict]:
@@ -138,7 +156,7 @@ async def _check_and_prove(world: "WorldSession", spec: dict) -> tuple[list[str]
     proof: dict = {}
     if errors:
         return errors, warnings, proof
-    minute = spanda._players_latest(world) if world.samskara().kala is not None else None
+    minute = spanda.players_latest(world) if world.samskara().kala is not None else None
     ents, mems, recs, ids = plant(spec, world.canon.world_time + 1, minute, "proof", lambda text: None)
     proof = await asyncio.to_thread(probe, world.canon, list(world.recent_memories), list(world.records), ents, mems, recs,
                                     list(world.playable_entity_ids), ids, spec)
@@ -160,7 +178,7 @@ async def propose_pratistha(req: PratisthaRequest, request: Request) -> Proposal
     world's gods. Cost: two model calls, a retrieval per player."""
     from smritilila.smrti.pratistha import survey, write
     world = await adhisthana.get_world()
-    roles = adhisthana._resolve_roles()
+    roles = adhisthana.resolve_roles()
     if roles.smrti_client is None:
         raise HTTPException(503, "no model to build with")
     view = _builder_view(world)
@@ -168,13 +186,14 @@ async def propose_pratistha(req: PratisthaRequest, request: Request) -> Proposal
     if req.focus and req.focus.strip():
         what, why, anchor = req.focus.strip(), "", ""
     else:
-        s = await asyncio.to_thread(survey, _seeder(roles.smrti_client), view)
+        s = await asyncio.to_thread(survey, udbhava.seeder(roles.smrti_client), view)
         found = s["candidates"]
         if not found:
             raise HTTPException(502, "the builder found nothing missing")
         c = found[s["choice"]]
         what, why, anchor = c["what"], c["why"], c.get("anchor", "")
-    spec = await asyncio.to_thread(write, _seeder(roles.smrti_client), view, what, why, anchor)
+    spec = await asyncio.to_thread(write, udbhava.seeder(roles.smrti_client), view, what, why, anchor)
+    spec = await _give_births(world, roles, spec)
     errors, warnings, proof = await _check_and_prove(world, spec)
     pid = new_id()[:12]
     # holder first (Marc, 2026-10-02): word-matching missed a paraphrased secret (the Temple's first proposal), so in a
@@ -190,15 +209,12 @@ async def propose_pratistha(req: PratisthaRequest, request: Request) -> Proposal
     return _proposal_out(doc, request)
 
 
-MAPS_DIR = data_dir() / "maps"  # outside git: a map is someone's drawing, kept here per world and named in a request by its file name
-
-
 def _map_file(world: "WorldSession", name: str) -> Path:
     """A file in this world's maps folder, by name -- never a path: a request cannot reach anywhere else on the disk."""
-    from smritilila.backup import _safe_dirname
+    from smritilila.backup import safe_dirname
     if not name or name != Path(name).name or name.startswith("."):
         raise HTTPException(422, "name a file in this world's maps folder, not a path")
-    f = MAPS_DIR / _safe_dirname(world.name or current_world() or "world") / name
+    f = paths.MAPS_DIR / safe_dirname(world.name or current_world() or "world") / name
     if not f.is_file():
         raise HTTPException(404, f"no map {name!r} in this world's maps folder")
     return f
@@ -214,10 +230,10 @@ async def propose_manacitra(req: ManacitraRequest, request: Request) -> Proposal
     names a secret or is asked to be: a map's geography is not one."""
     from smritilila.smrti import manacitra
     world = await adhisthana.get_world()
-    roles = adhisthana._resolve_roles()
+    roles = adhisthana.resolve_roles()
     if roles.smrti_client is None:
         raise HTTPException(503, "no model to build with")
-    earth = adhisthana._earth(world.canon)
+    earth = adhisthana.earth_of(world.canon)
     if earth is None:
         raise HTTPException(409, "this world has no earth to file a map under")
     picture = await asyncio.to_thread(manacitra.load_picture, _map_file(world, req.image))
@@ -225,7 +241,7 @@ async def propose_manacitra(req: ManacitraRequest, request: Request) -> Proposal
     known = [(eid, e.labels[0], "scene" if k.is_scene(eid) else "region") for eid, e in world.canon.entities.items()
              if e.labels and (k.is_scene(eid) or k.is_place(eid, t))]
     try:
-        spec, report, readings = await asyncio.to_thread(manacitra.read_map, _seeder(roles.smrti_client), world.world_data.get("source"), picture,
+        spec, report, readings = await asyncio.to_thread(manacitra.read_map, udbhava.seeder(roles.smrti_client), world.world_data.get("source"), picture,
                                                          known, set(world.canon.entities), earth, cols=req.cols, rows=req.rows, passes=req.passes)
     except manacitra.MapReadFailed as exc:
         raise HTTPException(502, f"the map could not be read whole: {exc}")
@@ -330,15 +346,15 @@ def _db_proof(database_url: str, canon: Maya, ents: list, mems: list, recs: list
     (the book, 2026-10-02: a memory filed in no place broke a NOT NULL the fork never saw) fails here, not live."""
     import subprocess
     import tempfile
-    from smritilila.backup import _pg_dump_path, _pg_dump_url
-    bin_dir = Path(_pg_dump_path()).parent
-    plain = _pg_dump_url(database_url)
+    from smritilila.backup import pg_dump_path, pg_dump_url
+    bin_dir = Path(pg_dump_path()).parent
+    plain = pg_dump_url(database_url)
     base, _, db = plain.rpartition("/")
     copy = f"{db}_pratistha_proof"
     env = {**os.environ}
     with tempfile.TemporaryDirectory() as tmp:
         dump = Path(tmp) / "w.dump"
-        subprocess.run([str(bin_dir / Path(_pg_dump_path()).name), "-Fc", "-f", str(dump), plain], check=True, env=env, capture_output=True)
+        subprocess.run([str(bin_dir / Path(pg_dump_path()).name), "-Fc", "-f", str(dump), plain], check=True, env=env, capture_output=True)
         admin = f"{base}/postgres"
         psql = str(bin_dir / ("psql.exe" if os.name == "nt" else "psql"))
         subprocess.run([psql, admin, "-q", "-c", f"drop database if exists {copy}", "-c", f"create database {copy}"], check=True, env=env, capture_output=True)
@@ -374,12 +390,12 @@ async def plant_pratistha(pid: str, request: Request) -> ProposalOut:
     errors, _warnings = check(spec, world.kosha(), set(world.playable_entity_ids), t)
     if errors or doc["errors"]:
         raise HTTPException(409, "the proposal does not stand: " + "; ".join(errors or doc["errors"]))
-    entry = adhisthana._active_world_registry_entry()
+    entry = adhisthana.active_world_registry_entry()
     if entry is None:
         raise HTTPException(409, "no registered world to back up first")
     await asyncio.to_thread(backup_world, entry, reason="pratistha")
     now = world.canon.world_time + 1
-    minute = spanda._players_latest(world) if world.samskara().kala is not None else None
+    minute = spanda.players_latest(world) if world.samskara().kala is not None else None
     embed = adhisthana.get_embedder().embed
     ents, mems, recs, ids = plant(spec, now, minute, f"pratistha:{pid}", embed)
     if doc.get("secret"):  # grown from a secret, or asked to be one: born secret
@@ -388,7 +404,7 @@ async def plant_pratistha(pid: str, request: Request) -> ProposalOut:
         await asyncio.to_thread(_db_proof, entry.database_url, world.canon, ents, mems, recs)
     except Exception as exc:  # noqa: BLE001 -- the copy refused it: the live world is never touched
         raise HTTPException(409, f"the seed failed against a copy of the world's database: {exc!r}"[:600])
-    await _store(world).commit(world.canon, mems, ents, records=recs)
+    await store_of(world).commit(world.canon, mems, ents, records=recs)
     doc["status"], doc["planted"], doc["ids"] = "planted", _now_iso(), ids
     (_proposals_dir(world) / f"{pid}.json").write_text(_json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
     log_event("pratistha.planted", id=pid, title=None if doc.get("secret") else spec.get("title"), entities=len(ents),

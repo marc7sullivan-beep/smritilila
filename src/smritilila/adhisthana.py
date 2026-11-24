@@ -12,7 +12,7 @@ Moved here whole from main.py, nothing inside changed. One rule came with
 the move: tests patch these services by name, so outside this module
 they are called through it (`adhisthana.get_world()`), never imported
 bare -- a bare import would be a second binding that a patch here does
-not reach, and a missed patch on _resolve_roles is a real, paid model
+not reach, and a missed patch on resolve_roles is a real, paid model
 call; on get_world_store, the database DATABASE_URL names.
 
 From main.py's docstring, moved here with the code it explains (2026-10-05):
@@ -39,7 +39,7 @@ fresh from scene presence every pulse, so there was nothing to recover
 on reload for that one anyway.
 
 Generative roles are real (smritilila.llm.*), constructed lazily inside each
-route's own body (see _resolve_roles), same Depends()-avoidance reasoning
+route's own body (see resolve_roles), same Depends()-avoidance reasoning
 as the old app: a live smoke test against a real running server showed
 FastAPI resolves Depends() params before a route's own body validation
 runs, so an eagerly-Depends()'d dependency that can fail (a missing API
@@ -51,6 +51,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
+import subprocess
+import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -75,6 +78,7 @@ from smritilila.smrti.kala import AGE_LEAD, INTERRUPTION_HOURS, chronicle_ids
 from smritilila.smrti import prakriti
 from smritilila.sakshi import bind_world, current_world, log_event, set_world
 from smritilila.backup import backup_world
+from smritilila.paths import REPO_ROOT, data_dir  # REPO_ROOT: where a new world's server is started from (routes/loka.py's own, four steps up from it, until 2026-11-10)
 from smritilila.world_store import PostgresWorldStore, WorldStore, make_world_store
 from smritilila.worlds_registry import WorldRegistryEntry, load_worlds_registry, registry_stamp
 from smritilila.schemas import PulseResponse
@@ -104,11 +108,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     -- correct here specifically because nothing is being served yet (no
     concurrent request's own event-loop turn to block). Then recalls
     the world this port last selected, and starts the describe_daily task
-    (routes/bija.py), cancelled at shutdown."""
+    (itihasa.py), cancelled at shutdown."""
     get_embedder()
     _recall_active_world()
-    from smritilila.routes import bija as bija_routes   # at call time: the routes import this module
-    daily = asyncio.create_task(bija_routes.describe_daily())   # the world's one line, drawn again once per real-time day
+    from smritilila import itihasa   # at call time: itihasa imports this module
+    daily = asyncio.create_task(itihasa.describe_daily())   # the world's one line, drawn again once per real-time day
     try:
         yield
     finally:
@@ -127,7 +131,7 @@ def _active_world_marker() -> Path:
     return data_dir() / f".smritilila_active_world.{port}"
 
 
-def _remember_active_world(name: str) -> None:
+def remember_active_world(name: str) -> None:
     """Both halves of "which world is this": the marker on disk, which a
     restart reads, and sakshi's own stamp, which every line written from
     here on carries. Kept in one function on purpose -- a world switch
@@ -176,7 +180,7 @@ def _name_of_the_default_world() -> str | None:
         return None
 
 
-def _pinned_world():
+def pinned_world():
     """The world whose own server this is (Marc, 2026-10-01: "I don't want
     people accidentally switching a world someone is playing in"): the
     registered world holding this server's port, or None -- a server no
@@ -196,10 +200,10 @@ def _recall_active_world() -> None:
     process that recalls nothing still gets a world stamped on its
     lines, from the default."""
     set_world(_name_of_the_default_world())
-    pinned = _pinned_world()
+    pinned = pinned_world()
     if pinned is not None:  # this port is that world's own server: nothing else is ever shown here
         app.state.active_database_url = pinned.database_url
-        _remember_active_world(pinned.name)
+        remember_active_world(pinned.name)
         log_event("world.pinned", name=pinned.name, url=pinned.url)
         return
     try:
@@ -233,7 +237,7 @@ class WorldSession:
     # a world born without one. Session-config bookkeeping, same category
     # as scene_owner_entity_id (persisted via save_session_config/
     # load_session_config below, not world canon) -- read by the world
-    # builder (routes/bija.py: expand, the bhuvana, describe), so it
+    # builder (routes/bija.py: expand, the bhuvana; itihasa.py: describe), so it
     # survives a process restart instead of only ever existing on this
     # one in-memory object. No pulse is handed it any more: the
     # Narrator's WORLD SETTING prompt section went with v2. (Named POST
@@ -327,6 +331,10 @@ class WorldSession:
     typed: dict[str, float] = field(default_factory=dict)  # saṅgama: when each player's page last reported typing
     # saṅgama: each player's first suggestion, as last offered -- taken for them when a round goes on without their action
     first_suggestion: dict[str, str] = field(default_factory=dict)
+    # hastagata (हस्तगत, "come to hand"; Marc, 2026-11-07): the action in hand of each being the world acts for -- its last turn's own
+    # suggested_next_action, carried to the next as its ACTION, so that turn can be a moment (pulse.kshana). Runtime, like `offered`: a restart
+    # forgets it, and the being's next turn is the span it was always given, which leaves its suggestion in hand again.
+    hastagata: dict[str, str] = field(default_factory=dict)
 
     def absent(self) -> frozenset[str]:
         """Out of the world: logged off, and not allowing the world to act
@@ -413,6 +421,8 @@ class WorldSession:
     darsana: str | None = None
     becomings: dict[str, str] = field(default_factory=dict)
     world_data: dict = field(default_factory=dict)
+    # ābhāsa (2026-11-11): this world's pictures, read and counted as they are first needed (abhasa.State); not persisted here
+    abhasa: Any = None
 
     def kosha(self) -> Kosha:
         """A reader's own fork of the kept containment index (not built from history)."""
@@ -498,7 +508,7 @@ def get_worlds_registry() -> list[WorldRegistryEntry]:
     return registry
 
 
-def _active_world_registry_entry() -> WorldRegistryEntry | None:
+def active_world_registry_entry() -> WorldRegistryEntry | None:
     """Whichever registry entry's own database_url matches the
     currently-active one -- None if the active database isn't a
     registered world at all (e.g. a bare DATABASE_URL with no
@@ -550,7 +560,7 @@ async def get_world() -> WorldSession:
         return world
 
 
-def _store(world: "WorldSession") -> WorldStore:
+def store_of(world: "WorldSession") -> WorldStore:
     """Where `world` is written: the store it was loaded from, never
     whichever the process has selected since (item 6)."""
     return world.store if world.store is not None else get_world_store()
@@ -559,7 +569,7 @@ def _store(world: "WorldSession") -> WorldStore:
 async def _load_world() -> WorldSession:
     store = get_world_store()
     if isinstance(store, PostgresWorldStore):
-        await _bring_to_head(getattr(app.state, "active_database_url", None) or os.environ["DATABASE_URL"])
+        await bring_to_head(getattr(app.state, "active_database_url", None) or os.environ["DATABASE_URL"])
     loaded = await store.load()
     if loaded is None:
         # v3: an empty store is an empty world, waiting on /genesis -- the
@@ -627,7 +637,7 @@ async def _load_world() -> WorldSession:
 class GenerativeRoles:
     """The one model client the world runs on (v3: the Narrator is a
     prompt over it, not a role class; bija and the age write over the
-    same client). Tests monkeypatch _resolve_roles to hand in a fake."""
+    same client). Tests monkeypatch resolve_roles to hand in a fake."""
     smrti_client: LLMClient | None = None
 
 
@@ -635,7 +645,7 @@ def build_roles(client: LLMClient) -> GenerativeRoles:
     return GenerativeRoles(smrti_client=client)
 
 
-def _resolve_roles() -> GenerativeRoles:
+def resolve_roles() -> GenerativeRoles:
     """The indirection point every route actually calls -- NOT wired up
     as a FastAPI Depends(). Confirmed via a live smoke test (a real
     running server, not TestClient) that FastAPI resolves ALL Depends()
@@ -664,7 +674,7 @@ def _resolve_roles() -> GenerativeRoles:
         raise HTTPException(503, providers.nothing_configured())
     client: LLMClient = available[0]
     if len(available) >= 2:
-        pinned = _pinned_world()
+        pinned = pinned_world()
         if pinned is not None and pinned.rotate_share is not None:
             share = pinned.rotate_share  # this world's own mix (worlds.json `rotate_share`, Austin 2026-10-05)
         else:
@@ -676,7 +686,7 @@ def _resolve_roles() -> GenerativeRoles:
     return build_roles(client)
 
 
-def _earth(canon: Maya) -> str | None:
+def earth_of(canon: Maya) -> str | None:
     """The world's earth (v4.45): its one world at large, or None."""
     ids = chronicle_ids(canon)
     return next(iter(ids)) if len(ids) == 1 else None
@@ -686,14 +696,14 @@ def _reaped(canon: Maya, records: list[Record], birth: tuple[str | None, dict, d
     """v5 §15: the world's view as its earth bears it. A world whose earth
     bears no seed yet keeps the view it was given at birth -- logged, so an
     unsown world is seen."""
-    earth = _earth(canon)
+    earth = earth_of(canon)
     if prakriti.sown(records, earth):
         return prakriti.reap(records, earth)
     log_event("prakriti.unsown", earth=earth, view=bool(birth[0] or birth[1] or birth[2]))
     return birth
 
 
-def _stream_of(world: WorldSession, eid: str | None) -> list[Memory]:
+def stream_of(world: WorldSession, eid: str | None) -> list[Memory]:
     """An entity's own memories, oldest first, from the kept index (samskara's MemIndex) -- the same list, in
     the same order, as a pass over every memory the world holds, without the pass (the pass of 2026-10-05)."""
     return world.samskara().mem.by_entity.get(eid, []) if eid else []
@@ -717,7 +727,7 @@ async def _log_off_idle(world: WorldSession) -> list[str]:
         world.presence[p] = "offline"
         log_event("player.auto_logoff", entity_id=p, idle_s=int(now - world.last_seen.get(p, world.started)),
                   absent=p in world.absent())
-    await _store(world).save_logged_off(sorted(world.logged_off))
+    await store_of(world).save_logged_off(sorted(world.logged_off))
     return gone
 
 
@@ -726,7 +736,7 @@ def _alembic_config():
     return Config(str(Path(__file__).resolve().parent.parent.parent / "alembic.ini"))
 
 
-def _migrate_database(database_url: str) -> None:
+def migrate_database(database_url: str) -> None:
     """alembic upgrade head against one database, in this process, the
     URL handed to env.py through config.attributes (never the process's
     DATABASE_URL). Called in a worker thread."""
@@ -736,7 +746,7 @@ def _migrate_database(database_url: str) -> None:
     command.upgrade(cfg, "head")
 
 
-async def _bring_to_head(database_url: str) -> None:
+async def bring_to_head(database_url: str) -> None:
     """A world's database at the code's migration head before it is loaded
     (2026-09-30). Only /worlds/create migrated: a world made before a
     migration stayed behind it, and the first write that needed it failed
@@ -757,7 +767,7 @@ async def _bring_to_head(database_url: str) -> None:
         return
     entry = next((w for w in get_worlds_registry() if w.database_url == database_url), None)
     backup = await asyncio.to_thread(backup_world, entry, reason="pre-migrate") if entry is not None else None
-    await asyncio.to_thread(_migrate_database, database_url)
+    await asyncio.to_thread(migrate_database, database_url)
     log_event("world.migrated", world=entry.name if entry else None, at=at, head=head, backup=str(backup) if backup else None)
 
 
@@ -786,7 +796,7 @@ NEAR_WINDOW = 20  # a player's last N tuples define the places that count as nea
 SCENE_CADENCE = 2
 
 
-def _fold_in(world: WorldSession, entities: Iterable[Entity], world_time: int) -> None:
+def fold_in(world: WorldSession, entities: Iterable[Entity], world_time: int) -> None:
     """What a commit wrote, into the live world -- and nothing else: the
     entities it wrote (as the store has them) replace or join the live ones,
     and the clock never goes back. Every commit path folds in this way (the
@@ -797,10 +807,81 @@ def _fold_in(world: WorldSession, entities: Iterable[Entity], world_time: int) -
     world.canon.world_time = max(world.canon.world_time, world_time)
 
 
-def _extend_history(world: WorldSession, memories: Iterable[Memory], records: Iterable[Record] = ()) -> None:
+def extend_history(world: WorldSession, memories: Iterable[Memory], records: Iterable[Record] = ()) -> None:
     """A commit's memories and records onto the live lists -- appended,
     never the lists replaced: another commit may have appended meanwhile
     (an NPC turn's snapshot replaced them, and an expansion's first tuples
     vanished from the running world while the store kept them)."""
     world.recent_memories.extend(memories)
     world.records.extend(records)
+
+
+# -- A world's own database and server (moved from routes/loka.py, 2026-11-10; nothing inside changed but `adhisthana.` dropped
+# from the calls of this module's own functions, the same lookup): a new world's database, made and migrated, and a server of its
+# own on a free port -- the seat a new world is served from, for the worlds the builder (routes/sthapati.py) and an invited author
+# (routes/loka.py) make. Called as adhisthana.X, so a test's patch here reaches them.
+
+
+def free_world_port() -> int:
+    """A port for an author's world's own server: from 8200 up, none a
+    registered world holds, none in use (8198 and 8199 are the shared ones)."""
+    import socket
+    held = {w.port for w in get_worlds_registry() if w.port} | {8198, 8199}
+    port = 8200
+    while True:
+        if port not in held:
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", port)) != 0:
+                    return port
+        port += 1
+
+
+def spawn_world_server(entry: WorldRegistryEntry) -> None:
+    """An author's world, on a server of its own (option 1): its marker names
+    the world, then the dev server starts detached on its port."""
+    marker = data_dir(REPO_ROOT) / f".smritilila_active_world.{entry.port}"   # where the server for this port will look (SMRITILILA_DATA_DIR in a container)
+    marker.write_text(entry.name, encoding="utf-8")
+    env = {**os.environ, "SMRITILILA_DEV_PORT": str(entry.port)}
+    env.pop("SMRITILILA_ACTIVE_WORLD_MARKER", None)
+    # CREATE_NO_WINDOW, never DETACHED_PROCESS (scripts/spawn_hidden.py says why): detached, the venv launcher's real python.exe opens a visible terminal window
+    flags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if sys.platform == "win32" else 0
+    subprocess.Popen([sys.executable, str(REPO_ROOT / "scripts" / "dev_server.py")],
+                     env=env, creationflags=flags, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log_event("world.server_started", name=entry.name, port=entry.port)
+
+
+def _db_slug(name: str) -> str:
+    import unicodedata
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")[:40]
+    return "smritilila_" + (slug or "world")
+
+
+async def make_world_database(name: str) -> tuple[str, str]:
+    """A new world's own database on the active world's server, migrated: (its name, its url)."""
+    from urllib.parse import urlsplit, urlunsplit
+    import asyncpg
+    base = getattr(app.state, "active_database_url", None) or os.environ.get("DATABASE_URL")
+    if not base:
+        raise HTTPException(503, "no database server to create the world on")
+    parts = urlsplit(base)
+    server_url = urlunsplit((parts.scheme, parts.netloc, "/postgres", "", ""))
+    taken: set[str] = set()
+    conn = await asyncpg.connect(server_url.replace("postgresql+asyncpg", "postgresql"))
+    try:
+        taken = {r["datname"] for r in await conn.fetch("select datname from pg_database")}
+        dbname = _db_slug(name)
+        n = 2
+        while dbname in taken:
+            dbname = f"{_db_slug(name)}_{n}"
+            n += 1
+        await conn.execute(f'create database "{dbname}"')
+    finally:
+        await conn.close()
+    database_url = urlunsplit((parts.scheme, parts.netloc, "/" + dbname, "", ""))
+    try:
+        await asyncio.to_thread(migrate_database, database_url)
+    except Exception as exc:
+        log_event("world.create_failed", name=name, database=dbname, error=repr(exc))
+        raise HTTPException(500, f"the new database could not be migrated: {exc!r}")
+    return dbname, database_url

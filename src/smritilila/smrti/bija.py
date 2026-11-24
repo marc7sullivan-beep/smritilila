@@ -33,11 +33,16 @@ place like any other.
 """
 from __future__ import annotations
 
+import contextvars
 import re
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
+from smritilila.ids import new_id
 from smritilila.llm.client import LLMClient
+from smritilila.memory.memory import Memory
+from smritilila.memory.salience import salience_of
 from smritilila.text import tokens, weight
 from smritilila.smrti.kosha import begins_with_name, whole_name
 from smritilila.smrti.narrator import DEFAULT_VIEW, own_view, use_of
@@ -318,7 +323,7 @@ ARRIVAL_SCHEMA = {
 _KEY = re.compile(r"[\W]+")  # v5 §7: letters of any script; was [a-z0-9], which made every non-Latin key "x"
 
 
-def _key(s: str) -> str:
+def label_key(s: str) -> str:
     return _KEY.sub("_", str(s).strip().lower()).strip("_") or "x"
 
 
@@ -350,7 +355,7 @@ def _place(p: dict) -> dict:
         row["name"] = str(p["name"]).strip()
     row["scene"] = bool(p["scene"]) if "scene" in p else True
     if str(p.get("in") or "").strip():
-        row["in"] = _key(str(p["in"]))
+        row["in"] = label_key(str(p["in"]))
     if str(p.get("clause") or "").strip():
         row["clause"] = str(p["clause"]).strip()  # v5 §7: this place's physics, holding within it
     nature = {}  # v5 §15: this place's nature, holding within it -- only what the seed says differs
@@ -371,7 +376,7 @@ def _view(out: dict) -> dict:
     becomings = {}
     for b in out.get("becomings") or []:
         if isinstance(b, dict) and str(b.get("key") or "").strip() and str(b.get("text") or "").strip():
-            becomings[_key(b["key"])] = str(b["text"]).strip()
+            becomings[label_key(b["key"])] = str(b["text"]).strip()
     view = str(out.get("view") or "").strip()
     return {"darsana": view or None, "becomings": becomings,
             "world_data": {"capabilities": {"perceives": bool(out.get("places_perceive")), "reaches": bool(out.get("perception_reaches"))},
@@ -419,10 +424,10 @@ def _person(q: dict) -> tuple[str, dict]:
     """A person row as a seed, its extension and an expansion all keep it:
     (key, {label, place, tuples, name?}). Whether it is kept is each
     caller's own rule."""
-    row = {"label": q["label"].strip(), "place": _key(q["place"]), "tuples": _tuples(q["tuples"])}
+    row = {"label": q["label"].strip(), "place": label_key(q["place"]), "tuples": _tuples(q["tuples"])}
     if str(q.get("name") or "").strip():
         row["name"] = str(q["name"]).strip()
-    return _key(q["key"]), row
+    return label_key(q["key"]), row
 
 
 def as_spec(out: dict, begins: bool = False) -> dict:
@@ -437,7 +442,7 @@ def as_spec(out: dict, begins: bool = False) -> dict:
     people standing in it."""
     places: dict[str, dict] = {}
     for p in _rows(out.get("places"), ("key", "label", "tuple")):
-        places[_key(p["key"])] = _place(p)
+        places[label_key(p["key"])] = _place(p)
     if not places:
         raise ValueError("the seed names no place")
     _prune_tree(places)
@@ -451,7 +456,7 @@ def as_spec(out: dict, begins: bool = False) -> dict:
             log_event("bija.name_not_whole", key=k, label=row["label"], name=row.get("name"), seed=True)
         people[k] = row
     if begins:
-        start = _key(out.get("begins", ""))
+        start = label_key(out.get("begins", ""))
         if start not in places or not places[start].get("scene", True):
             scenes = [k for k, p in places.items() if p.get("scene", True)] or list(places)
             crowd = Counter(q["place"] for q in people.values())
@@ -469,7 +474,7 @@ def as_spec(out: dict, begins: bool = False) -> dict:
             "people": people,
             "view": _view(out),
         }
-    player = _key(out.get("player", ""))
+    player = label_key(out.get("player", ""))
     if player not in people:
         raise ValueError(f"the seed's player {player!r} is not among its people")
     return {
@@ -602,7 +607,7 @@ def _extend(client: LLMClient, spec: dict, user: str, places_short: int, people_
     out = out if isinstance(out, dict) else {}
     added_places = added_people = 0
     for p in _rows(out.get("places"), ("key", "label", "tuple")):
-        k = _key(p["key"])
+        k = label_key(p["key"])
         if k in spec["places"] or any(p["label"].strip().lower() == q["label"].lower() for q in spec["places"].values()):
             continue
         spec["places"][k] = _place(p)
@@ -673,10 +678,10 @@ def _regroup(client: LLMClient, spec: dict) -> dict:
         return spec
     made = moved = 0
     for g in _rows((out or {}).get("groups"), ("key", "label", "in", "tuple", "holds")):
-        holder, key = _key(g["in"]), _key(g["key"])
+        holder, key = label_key(g["in"]), label_key(g["key"])
         if holder not in crowded or key in places or not isinstance(g.get("holds"), list):
             continue
-        held = [c for c in dict.fromkeys(_key(str(x)) for x in g["holds"]) if c in crowded[holder] and places[c].get("in") == holder]
+        held = [c for c in dict.fromkeys(label_key(str(x)) for x in g["holds"]) if c in crowded[holder] and places[c].get("in") == holder]
         if len(held) < 2:
             continue
         row = _place({"label": g["label"], "name": g.get("name"), "tuple": g["tuple"], "in": holder, "scene": False})
@@ -736,6 +741,131 @@ def write_arrival(client: LLMClient, self_description: str, place_label: str, pl
     }
 
 
+# -- Birth memories (Marc, 2026-11-06: every time an entity is assigned its first memory it is also given a birth memory that comes before it) --
+#
+# The shape is the arrival's: two or three first-person tuples, each with a weight and a use of its own, and the last, heaviest, a LIFE PURPOSE
+# (his word for the priests, same day: what truly drives the being, larger than any scheme). The engine calls this writer where a builder plants
+# a person; nothing is flagged and nothing is typed: the rows are ordinary tuples that sort before the being's first. Replayed twice on beings
+# the Narrator minted in recorded Stonemarch pulses and on Romag (18 calls, model-b): the first wording re-told an event already past in
+# about a third of the draws, named people it had not been given (two invented, one garbled) and let a living character owe a blood debt it did
+# not remember; this wording, 18 of 18 end on a purpose, none re-tells or plans, none names an unseen person, none claims a shared past.
+
+BIRTH_SYSTEM = """You write one BEGINNING for a being that has just come into view in an existing world for Smritilila. You are shown what it is, where it is, and the first thing it remembers -- the tuple the telling has already written for it -- and nothing else of the world but its source, its shape at large and its view. Write the beginning as one who remembers, whatever they are: two or three tuples in their OWN voice, first person, past tense, that come BEFORE the one they already have, so that one stands on them.
+
+Together they hold, in whatever order tells it best, a few sentences each:
+ - who they are and what place they have here (the first tuple opens with this);
+ - how they came to be who they are: one thing that shaped them;
+ - what they believe, of the world, the gods or other people; what they like and what they cannot abide; whom they trust, and what they owe or are owed;
+ - and last, and heaviest, their LIFE PURPOSE: what truly drives them in this life, the thing the rest of their wants serve. It is larger than any errand or scheme of the day and is never a duty restated: a duty is what they do, a purpose is what they would live for even if no one asked. Scale it to who they are, a ditcher's purpose is ditch-sized, a wolf's is a wolf's, but give them one, particular and their own.
+
+Fit it to the place and to everything the memory they already have holds: keep every fact it states, never contradict it, and invent only where it is silent. THAT memory already holds what they are doing and what has just happened: re-tell none of it, state no plan for the day, and write nothing that happens after it. Name a person only if the memory they already have names them; for anyone else say what that one is to them (the sergeant who vouched for them, a brother across the river), and never give a named person a past with them that the memory does not state. A creature writes as what it is: what it hunts, fears, knows, in its own idiom, not as a person in fur. It is what they believe of themselves and may be partial or mistaken. Make nothing in it a player's deed, and never speak of ids, ticks or the machinery. Give each tuple a weight (indelible, marking, weighty, notable, ordinary) and a USE -- what it gives them to act on: key (it locates something, names something, opens a way, or changes how they will read what follows), useful (a fact they may need again), or none (mood, routine). Never explain."""
+
+BIRTH_SCHEMA = {
+    "type": "object",
+    "properties": {"tuples": ARRIVAL_SCHEMA["properties"]["tuples"]},
+    "required": ["tuples"],
+}
+
+BIRTHS_AT_ONCE = 4   # calls in flight when a build writes many; a build asks one per person, bounded by its cast and never by the world's history
+
+
+def write_birth(client: LLMClient, label: str, place_label: str, memory: list[str], bhuvana: str | None = None,
+                darsana: str | None = None, source: str | None = None) -> list[dict]:
+    """One being's birth memory: two or three first-person tuples ({"text", "weight", "use"}) that come before `memory`, the tuples it was
+    planted with. Raises ValueError when the answer holds fewer than two (the caller leaves the being without; a build never fails for it)."""
+    user = "\n".join([
+        *([f"THIS WORLD'S SOURCE: {source.strip()} -- write the beginning in its idiom, accurate to it where it speaks"] if source and source.strip() else []),
+        f"THE BEING: {label}",
+        f"WHERE IT IS: {place_label}",
+        "WHAT IT ALREADY REMEMBERS (its beginning comes before this):\n" + "\n".join(f"  - {t}" for t in memory),
+        *_at_large(bhuvana),
+        *_views(darsana),
+    ])
+    out = client.complete_with_tool(BIRTH_SYSTEM, user, tool_name="write_birth", tool_description="One being's birth memory: the tuples that come before its first.",
+                                    input_schema=BIRTH_SCHEMA, max_tokens=4096)
+    tuples = _tuples((out if isinstance(out, dict) else {}).get("tuples"))[:3]
+    if len(tuples) < 2:
+        raise ValueError("the birth memory is too short")
+    return tuples
+
+
+def write_births(client: LLMClient, beings: list[dict], bhuvana: str | None = None, darsana: str | None = None,
+                 source: str | None = None, workers: int = BIRTHS_AT_ONCE) -> dict[str, list[dict]]:
+    """A birth memory for each of `beings` ({"key", "label", "place", "memory": [first tuples' text]}): {key: tuples} for those written.
+    A call that fails leaves its being without one (logged, `bija.birth_failed`); it never fails the build that asked."""
+    def one(b: dict) -> tuple[str, list[dict] | None]:
+        try:
+            return b["key"], write_birth(client, b["label"], b["place"], b["memory"], bhuvana, darsana, source)
+        except Exception as exc:  # noqa: BLE001 -- a slip leaves one being without a birth, never a failed build
+            log_event("bija.birth_failed", key=b["key"], error=str(exc)[:200])
+            return b["key"], None
+    if not beings:
+        return {}
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(beings)))) as pool:
+        # each call in its own copy of this context: the world the witness files under, the pulse id the call is logged with
+        futures = [pool.submit(contextvars.copy_context().run, one, b) for b in beings]
+        done = [f.result() for f in futures]
+    out = {k: v for k, v in done if v}
+    log_event("bija.births", asked=len(beings), written=len(out))
+    return out
+
+
+def birth_asks(people: dict[str, dict], place_label, skip: frozenset[str] = frozenset()) -> list[dict]:
+    """What `write_births` is asked, from a spec's people ({key: {"label", "place", "tuples"}}): everyone but `skip` (a player, whose own
+    description is their first memory). `place_label(place key)` is the name of where they stand."""
+    asks = []
+    for key, p in people.items():
+        texts = [t if isinstance(t, str) else str(t.get("text") or "") for t in p.get("tuples") or []]
+        texts = [t.strip() for t in texts if t.strip()]
+        if key in skip or not texts:
+            continue
+        asks.append({"key": key, "label": p["label"], "place": place_label(p["place"]), "memory": texts})
+    return asks
+
+
+# The fourth route (Marc, 2026-11-08: "Wire in the narrator in-pulse minting"): a pulse the Narrator tells gives a perceiver its first tuple -- a
+# person it minted, or a being the world held no memory of until now. The engine writes the birth, as it does for the builder's people, and the rows
+# go into the SAME commit as that first tuple, one tick before it. Not after it: the live log reads a commit onto the end of each stream, so a row
+# written later would sit behind the being's newer tuples until a restart sorted it back (a fresh build orders by tick; the read-on does not), and
+# the only cure for that is a rebuild of the whole log, seconds on a world of 13,000 memories, on every pulse that mints (one in twelve on
+# Stonemarch). The birth's pulse id is its own ("birth:<the telling's>"), never the telling's: a weighty row under the telling's id would make that
+# pulse heavier to the news (janasruti reads a pulse's heaviest personal weight), and a birth is nobody's news.
+
+BIRTH_PULSE = "birth:"
+BIRTH_TUPLES_SHOWN = 3   # of a being's first tuples, the writer is shown at most this many
+
+
+def first_memories(written: list[Memory], has_memory) -> dict[str, list[Memory]]:
+    """The experience tuples (PRIMARY, SECONDARY) of every perceiver in `written` that has no memory of any tier yet: {entity: its tuples, in
+    stream order}. `has_memory(entity)` is the world's answer BEFORE this commit. A scene's impersonal row (AMBIENT) is nobody's first memory; a
+    being the telling minted has none yet; one an earlier telling minted with no tuple of its own gets its first here."""
+    out: dict[str, list[Memory]] = {}
+    for m in sorted(written, key=lambda m: (m.world_time, m.id)):
+        if m.tier in ("PRIMARY", "SECONDARY") and not has_memory(m.entity_id):
+            out.setdefault(m.entity_id, []).append(m)
+    return out
+
+
+def birth_rows(eid: str, tuples: list[dict], first: Memory, pulse_id: str, embed) -> list[Memory]:
+    """A birth memory's tuples ({"text", "weight", "use"}) as ordinary rows, one tick before `first` (the being's first tuple in the telling,
+    `pulse_id`): its place and its minutes, ids that sort in order within the tick, a weight and a use of their own. Nothing marks them."""
+    prefix = new_id()[:24]  # ids that sort in order within one tick (the store reads by tick, then id)
+    tick = first.world_time - 1
+    return [Memory(f"{prefix}{i:08x}", eid, frozenset(), t["text"], "PRIMARY", salience_of(t.get("weight"), default=4), first.location_id, tick,
+                   BIRTH_PULSE + pulse_id, embed(t["text"]), use=use_of(t["use"]) if t.get("use") else None, began=first.began, ended=first.ended)
+            for i, t in enumerate(tuples)]
+
+
+def births_beside(client: LLMClient, firsts: dict[str, list[Memory]], who: dict[str, tuple[str, str]], pulse_id: str, embed,
+                  bhuvana: str | None = None, darsana: str | None = None, source: str | None = None) -> list[Memory]:
+    """The birth rows for each being in `firsts` ({entity: its first tuples in a telling}), written by `write_births`; `who[entity]` is (what it
+    is called, the name of where it stands). A being whose call fails is left without one (logged); the telling is never failed for it."""
+    beings = [{"key": eid, "label": who[eid][0], "place": who[eid][1], "memory": [m.experience for m in ms[:BIRTH_TUPLES_SHOWN]]}
+              for eid, ms in firsts.items()]
+    written = write_births(client, beings, bhuvana, darsana, source)
+    return [row for eid, tuples in written.items() for row in birth_rows(eid, tuples, firsts[eid][0], pulse_id, embed)]
+
+
 START_SYSTEM = """You place one NEWCOMER into an existing world for Smritilila, from where their player says they start. You are shown the world's places, each as key: label (scene or region, and the place that holds it). If one listed SCENE is the place described -- the same place, not merely one like it or near it -- give its key as `existing`, and nothing else. Otherwise leave `existing` empty and add ONE new scene where the description puts them: its `label` (never one already listed), its `name` if it bears one, `in` -- the key of the listed place that holds it, the nearest that fits (the region it lies in, or a scene it lies within) -- and its `tuple`: the place's impersonal first tuple, what is there, what it is near and where its ways lead, in this world's idiom. Keep every fact the description states about the place. Never explain."""
 
 START_SCHEMA = {
@@ -757,7 +887,7 @@ def write_start(client: LLMClient, start: str, self_description: str, places: di
     {"existing": key} for a listed scene that is the place, else
     {"new": {label, name, in, tuple}} -- one new scene inside a listed place.
     `places` maps a key to (label, "scene|region, in <key>"). Structure is
-    the engine's to check (routes/bija.py's _described_start), never this call's."""
+    the engine's to check (udbhava.py's _described_start), never this call's."""
     listing = "\n".join(f"  {k}: {label} ({kind})" for k, (label, kind) in places.items())
     user = "\n".join([
         *([f"THIS WORLD'S SOURCE: {source.strip()} -- a new place belongs to it: accurate where it speaks, in its idiom where it is silent"]
@@ -830,7 +960,7 @@ def expand(client: LLMClient, setting: str | None, places: dict[str, tuple[str, 
     known_labels = {label.lower() for label, _ in places.values()} | {label.lower() for label, _ in standing} | {l.lower() for l in labels_taken}
     new_places: dict[str, dict] = {}
     for p in _rows(out.get("places"), ("key", "label", "tuple")):
-        k = _key(p["key"])
+        k = label_key(p["key"])
         if k in places or k in new_places or p["label"].strip().lower() in known_labels:
             continue
         new_places[k] = _place(p)

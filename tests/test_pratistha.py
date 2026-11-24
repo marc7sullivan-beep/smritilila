@@ -91,16 +91,25 @@ def test_a_seed_that_does_not_stand_is_refused_by_the_check() -> None:
     assert any("already called Teo" in e for e in check(taken, k2, {"teo"}, 11)[0])
 
 
+BIRTH = [{"text": "I was a drowned tinker's daughter, raised by the reed-cutters, and I count who comes because someone must.", "weight": "marking", "use": "useful"},
+         {"text": "I believe the fen keeps an account and that every debt to it falls due; I cannot abide a liar at the water.", "weight": "notable", "use": "useful"},
+         {"text": "I live so that the fen's account is kept honestly and no one is given to it unmourned.", "weight": "indelible", "use": "key"}]
+
+
 class _Builder:
-    """A fake model for the builder: the survey and the seed, by tool."""
+    """A fake model for the builder: the survey, the seed and a person's birth memory, by tool."""
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.users: list[str] = []
 
     def complete_with_tool(self, system, user, *, tool_name, tool_description, input_schema, max_tokens=None):
         self.calls.append(tool_name)
         if tool_name == "survey":
             return {"candidates": [{"what": "the Reed Chapel the inn talks of", "why": "spoken of, not held", "source": "talk",
                                     "importance": 4, "nearness": 3, "anchor": "fen"}], "choice": 0}
+        if tool_name == "write_birth":
+            self.users.append(user)
+            return {"tuples": json.loads(json.dumps(BIRTH))}
         return json.loads(json.dumps(SPEC))
 
 
@@ -112,16 +121,18 @@ def test_a_proposal_waits_for_review_and_is_planted_only_when_a_god_says(client:
     world.recent_memories, world.records = list(mems), list(recs)
     client.app.state.world = world
     builder = _Builder()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=builder))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=builder))
     monkeypatch.setattr(pratistha_routes, "PROPOSALS_DIR", tmp_path)
     r = client.post("/world/pratistha", json={})
     assert r.status_code == 200, r.text
     p = r.json()
-    assert builder.calls == ["survey", "pratistha"] and p["status"] == "proposed" and p["errors"] == []
-    assert any("Ossa Wend" in line for line in p["summary"]) and fake_store.commit_calls == []   # nothing planted yet
+    assert builder.calls == ["survey", "pratistha", "write_birth"] and p["status"] == "proposed" and p["errors"] == []   # one birth memory for the one person
+    assert any("Ossa Wend" in line and "birth memory of 3" in line for line in p["summary"]) and fake_store.commit_calls == []   # nothing planted yet
+    assert "THE BEING: Ossa Wend, a priest in a wet grey robe" in builder.users[0] and "WHERE IT IS: a chapel of reeds" in builder.users[0]   # shown who, and where
+    assert "I keep the Reed Chapel for those who pay the fen its due" in builder.users[0]                                # and the first memory it comes before
     assert [x["id"] for x in client.get("/world/pratistha").json()] == [p["id"]]
     planted: dict = {}
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("E", (), {"database_url": "postgresql://x/y"})())
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("E", (), {"database_url": "postgresql://x/y"})())
     monkeypatch.setattr("smritilila.backup.backup_world", lambda entry, reason="": planted.setdefault("backup", reason))
     monkeypatch.setattr(pratistha_routes, "_db_proof", lambda *a: planted.setdefault("copy", True))
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("Em", (), {"embed": staticmethod(lambda text: None)})())
@@ -130,6 +141,10 @@ def test_a_proposal_waits_for_review_and_is_planted_only_when_a_god_says(client:
     assert r.json()["status"] == "planted" and planted == {"backup": "pratistha", "copy": True}
     _canon, result, _ = fake_store.commit_calls[-1]
     assert {e.labels[0] for e in result.promoted_entities} >= {"a chapel of reeds", "a priest in a wet grey robe", "a ledger of names"}
+    keeper = next(e.id for e in result.promoted_entities if e.labels[0] == "a priest in a wet grey robe")
+    stream = sorted((m for m in result.memories_written if m.entity_id == keeper), key=lambda m: (m.world_time, m.id))
+    assert [m.experience for m in stream] == [b["text"] for b in BIRTH] + [t["text"] for t in SPEC["people"][0]["tuples"]]   # the birth memory first, as read
+    assert [(m.salience, m.use) for m in stream[:3]] == [(2, "useful"), (4, "useful"), (1, "key")]                          # each with its own weight and use
     assert client.post(f"/world/pratistha/{p['id']}/plant").status_code in (409, 404)        # planted once
     client.app.state.world = world  # the endpoint drops the world to reload it; the fake store has no loader here
     world.recent_memories += list(result.memories_written)
@@ -149,7 +164,7 @@ def test_a_proposal_touching_a_secret_is_withheld_from_every_god_outside_it(clie
     world = WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["inn"], playable_entity_ids=["teo"])
     world.recent_memories, world.records = list(mems), list(recs)
     client.app.state.world = world
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=_Builder()))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=_Builder()))
     monkeypatch.setattr(pratistha_routes, "PROPOSALS_DIR", tmp_path)
     away = {"cf-ray": "remote", "cf-access-authenticated-user-email": sorted(dvara.OWNERS)[0]}  # a god through Cloudflare
     p = client.post("/world/pratistha", json={}, headers=away).json()
@@ -159,7 +174,7 @@ def test_a_proposal_touching_a_secret_is_withheld_from_every_god_outside_it(clie
     assert client.post(f"/world/pratistha/{p['id']}/plant", headers=away).status_code == 403
     here = client.get("/world/pratistha").json()[0]                               # the god who holds it
     assert here["title"] == "The Reed Chapel" and here["summary"]
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("E", (), {"database_url": "postgresql://x/y"})())
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("E", (), {"database_url": "postgresql://x/y"})())
     monkeypatch.setattr("smritilila.backup.backup_world", lambda entry, reason="": None)
     monkeypatch.setattr(pratistha_routes, "_db_proof", lambda *a: None)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("Em", (), {"embed": staticmethod(lambda text: None)})())
@@ -190,7 +205,7 @@ def test_in_a_world_that_holds_a_secret_every_proposal_goes_to_the_holder_first(
     world = WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["inn"], playable_entity_ids=["teo"])
     world.recent_memories, world.records = list(mems), list(recs)
     client.app.state.world = world
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=_Builder()))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=_Builder()))
     monkeypatch.setattr(pratistha_routes, "PROPOSALS_DIR", tmp_path)
     away = {"cf-ray": "remote", "cf-access-authenticated-user-email": sorted(dvara.OWNERS)[0]}
     p = client.post("/world/pratistha", json={}).json()                         # names nothing secret, still withheld

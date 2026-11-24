@@ -203,11 +203,11 @@ def test_a_closed_valley_is_never_asked_who_came_and_the_dale_around_it_is(monke
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.records = list(config["records"])
     world.recent_memories = list(mems)
-    pool = pravrtti._smrti_exploration_pool(world)
+    pool = pravrtti.smrti_exploration_pool(world)
     assert by["the valley farm"] not in pool
     world.records.append(Record("o1", "prakriti", by["the hidden valley"], None, 3, "p3", "pacing"))  # the valley opened
     world._samskara = None
-    assert by["the valley farm"] in pravrtti._smrti_exploration_pool(world)
+    assert by["the valley farm"] in pravrtti.smrti_exploration_pool(world)
 
 
 def test_a_nature_copied_onto_every_scene_is_the_regions_and_a_copied_rate_does_not_compose() -> None:

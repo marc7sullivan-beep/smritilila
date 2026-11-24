@@ -12,14 +12,14 @@ from pathlib import Path
 import pytest
 
 from smritilila import adhisthana
-from smritilila.routes import loka, pratistha
+from smritilila.routes import pratistha
 
 REPO = Path(__file__).resolve().parent.parent
 
 
-def test_the_repo_root_the_routes_use_is_the_repo():
-    assert loka.REPO_ROOT == REPO
-    assert (loka.REPO_ROOT / "scripts" / "dev_server.py").is_file() and (loka.REPO_ROOT / "src" / "smritilila" / "main.py").is_file()
+def test_the_repo_root_a_world_server_is_started_from_is_the_repo():
+    assert adhisthana.REPO_ROOT == REPO
+    assert (adhisthana.REPO_ROOT / "scripts" / "dev_server.py").is_file() and (adhisthana.REPO_ROOT / "src" / "smritilila" / "main.py").is_file()
 
 
 def test_proposals_are_kept_in_the_repos_proposals_folder_not_under_src():
@@ -37,12 +37,12 @@ def test_a_world_server_is_started_from_the_repo_root(monkeypatch, tmp_path):
     """The spawn names its world in a marker beside the repo and runs scripts/dev_server.py from there -- with the root where a test
     can see it, so a wrong root fails here and not in the first world someone builds."""
     (tmp_path / "scripts").mkdir()
-    monkeypatch.setattr(loka, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(adhisthana, "REPO_ROOT", tmp_path)
     started = []
-    monkeypatch.setattr(loka.subprocess, "Popen", lambda args, **kw: started.append((args, kw)))
-    monkeypatch.setattr(loka, "log_event", lambda *a, **k: None)
-    entry = loka.WorldRegistryEntry(name="Tide Hall", database_url="postgresql+asyncpg://x/tide_hall", port=8231)
-    loka._spawn_world_server(entry)
+    monkeypatch.setattr(adhisthana.subprocess, "Popen", lambda args, **kw: started.append((args, kw)))
+    monkeypatch.setattr(adhisthana, "log_event", lambda *a, **k: None)
+    entry = adhisthana.WorldRegistryEntry(name="Tide Hall", database_url="postgresql+asyncpg://x/tide_hall", port=8231)
+    adhisthana.spawn_world_server(entry)
     assert (tmp_path / ".smritilila_active_world.8231").read_text(encoding="utf-8") == "Tide Hall"                  # which world this port serves
     args, kw = started[0]
     assert args[1] == str(tmp_path / "scripts" / "dev_server.py") and kw["env"]["SMRITILILA_DEV_PORT"] == "8231"      # and what runs on it
@@ -94,12 +94,12 @@ def test_a_world_server_started_by_the_builder_looks_for_its_marker_in_the_data_
     monkeypatch.setenv("SMRITILILA_DATA_DIR", str(tmp_path / "data"))
     (tmp_path / "data").mkdir()
     (tmp_path / "scripts").mkdir()
-    monkeypatch.setattr(loka, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(loka.subprocess, "Popen", lambda args, **kw: None)
-    monkeypatch.setattr(loka, "log_event", lambda *a, **k: None)
+    monkeypatch.setattr(adhisthana, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(adhisthana.subprocess, "Popen", lambda args, **kw: None)
+    monkeypatch.setattr(adhisthana, "log_event", lambda *a, **k: None)
     monkeypatch.delenv("SMRITILILA_ACTIVE_WORLD_MARKER", raising=False)
-    entry = loka.WorldRegistryEntry(name="Tide Hall", database_url="postgresql+asyncpg://x/t", port=8231)
-    loka._spawn_world_server(entry)
+    entry = adhisthana.WorldRegistryEntry(name="Tide Hall", database_url="postgresql+asyncpg://x/t", port=8231)
+    adhisthana.spawn_world_server(entry)
     monkeypatch.setenv("SMRITILILA_DEV_PORT", "8231")
     assert (tmp_path / "data" / ".smritilila_active_world.8231").read_text(encoding="utf-8") == "Tide Hall"
     assert adhisthana._active_world_marker() == tmp_path / "data" / ".smritilila_active_world.8231"

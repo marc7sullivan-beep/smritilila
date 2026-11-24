@@ -15,9 +15,11 @@ Postgres 17 build doesn't include it). Similarity is computed in Python
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Text
+from datetime import datetime
+
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Identity, Integer, LargeBinary, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, deferred
 
 
 class Base(DeclarativeBase):
@@ -60,7 +62,7 @@ class SessionConfigRow(Base):
     setting_description: the setting description a world was seeded
     from, NULL for a plain /genesis world -- read back when the world at
     large, an expansion or the world's one-line description is written
-    from it (routes/bija.py)."""
+    from it (routes/bija.py, itihasa.py)."""
 
     __tablename__ = "session_config"
 
@@ -145,3 +147,25 @@ class RecordRow(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     world_time: Mapped[int] = mapped_column(Integer, nullable=False)
     pulse_id: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class PictureRow(Base):
+    """Citra (2026-11-11, memory/chitra.py): one picture the world keeps, its bytes in the row so that it travels with the world's backups.
+    Insert-only. `seq` is the order they were kept in (a page asks for those after the last it saw); `data` is deferred, so an index of the
+    world's pictures never reads a megabyte it does not show."""
+
+    __tablename__ = "pictures"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=False), unique=True, nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pulse_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    world_time: Mapped[int] = mapped_column(Integer, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    mime: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    data: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
+    size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seeds: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    made_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

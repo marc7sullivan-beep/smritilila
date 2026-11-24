@@ -18,5 +18,5 @@ os.environ.pop("DATABASE_URL", None)
 # nor the ntfy topic (2026-10-05): it is set in Marc's user environment, and six tests reach the real _alert, which
 # posts to it -- a run from a fresh terminal would push the tests' guests to his phone. Unset, nothing is sent.
 os.environ.pop("SMRITILILA_NTFY_TOPIC", None)
-# the Host allow-list (dvara._host_refusal): Starlette's TestClient and httpx's ASGI transport say "testserver" / "test"
+# the Host allow-list (dvara.host_refusal): Starlette's TestClient and httpx's ASGI transport say "testserver" / "test"
 os.environ.setdefault("SMRITILILA_ALLOWED_HOSTS", "testserver,test")

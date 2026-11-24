@@ -186,5 +186,6 @@ def test_the_schema_offers_closes_with_unlike_examples_and_the_second_model_must
     assert "follows" not in item["properties"]
     desc = item["properties"]["closes"]["description"]
     assert "INJURY" in desc and "PROMISE" in desc and "BUCKET OF WATER" in desc               # three matters unlike one another
+    assert desc.endswith("for this perceiver may be named.")                                  # the sentence was left unfinished from v5.30 to v5.61
     faces = _SCHEMA_FACES["properties"]["perceiver_tuples"]["items"]
     assert "closes" in faces["required"] and "follows" not in faces["required"]

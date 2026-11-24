@@ -19,3 +19,8 @@ def data_dir(default: Path | None = None) -> Path:
     """The folder state is kept in: SMRITILILA_DATA_DIR, else `default`, else the repository's root."""
     env = (os.environ.get("SMRITILILA_DATA_DIR") or "").strip()
     return Path(env) if env else (default or REPO_ROOT)
+
+
+# One place for maps, read as paths.MAPS_DIR by pratiṣṭhā's routes and the builder, so a test that replaces it here reaches both
+# (routes/pratistha.py's until 2026-11-10, when the builder stopped importing a route for it).
+MAPS_DIR = data_dir() / "maps"  # outside git: a map is someone's drawing, kept here per world and named in a request by its file name

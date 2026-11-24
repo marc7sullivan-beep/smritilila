@@ -23,7 +23,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Callable
 
-from smritilila.llm.client import LLMClient, local_client_from_env
+from smritilila.llm.client import LLMClient, Painter, local_client_from_env
 from smritilila.sakshi import log_event
 
 
@@ -38,6 +38,8 @@ class Provider:
     hint: str
     seed_word: str | None = None
     swaps: Callable[[], dict[str, dict[str, str]]] | None = None
+    # ābhāsa (2026-11-11): the client that makes pictures, if this provider has one and is configured for it (None: it has not)
+    make_painter: Callable[[], "Painter | None"] | None = None
 
 
 _PROVIDERS: dict[str, Provider] = {}
@@ -93,6 +95,21 @@ def best(model: str | None = None) -> LLMClient:
         if client is not None:
             return client
     raise KeyError(nothing_configured())
+
+
+def painter() -> "Painter | None":
+    """The first configured provider's picture maker, in `best_rank` order, or None: no provider that makes pictures is configured, and a world
+    that asks for pictures then has none (the release, which has no such provider, is such a build)."""
+    for provider in sorted(all_providers(), key=lambda p: p.best_rank):
+        if provider.make_painter is None:
+            continue
+        try:
+            made = provider.make_painter()
+        except (KeyError, ValueError):
+            continue
+        if made is not None:
+            return made
+    return None
 
 
 def configured() -> list[str]:

@@ -9,7 +9,7 @@ explicit user decision (see the project_smritilila_activation_episode_pulse_
 budget memory); raised to 1 by explicit user instruction. This module
 itself stays a PURE selection function -- it decides WHO is activated and
 how many pulses (1) that grants, but does not run them. The caller
-(routes/spanda.py's _after_smrti_commit) is responsible for actually spending the budget:
+(spanda.py's _after_smrti_commit) is responsible for actually spending the budget:
 it hands pulses_run to _run_smrti_activation_in_background, which runs
 the same v3 pulse a player gets with no action supplied and commits the
 result through the same world store path. Selection stays here,

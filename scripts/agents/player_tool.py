@@ -289,6 +289,10 @@ def cmd_watch(p: Player, a: argparse.Namespace) -> int:
             say(f"A ROUND IS OPEN and {p.cfg['name']} has not acted. In it: {members_line(r)}. Act at once.")
             break
         if time.time() - start >= QUIET:
+            if r.get("open") and r.get("acted"):               # the world knows the character has acted: an agent with no memory of its turns is not asked to act again (a second action replaces the first)
+                n = p.cfg["name"]
+                say(f"WAITING: {n} has acted in the open round and the others have not. Nothing is {n}'s to do: run `watch` again.")
+                break
             why = p.alone_verdict()
             if why:
                 say("HOLD:", why)

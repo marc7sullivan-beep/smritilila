@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """API-level tests using FastAPI's TestClient, against the v3 API surface
 (the v1.4 Entity/Relation engine behind it was removed with v2, 2026-09-21). Most tests monkeypatch
-smritilila.adhisthana._resolve_roles with fakes -- no THE_FIRST_API_KEY/the second model_API_KEY
+smritilila.adhisthana.resolve_roles with fakes -- no THE_FIRST_API_KEY/the second model_API_KEY
 is available in this environment (or needed: these test routing,
 request/response shaping, and world-state mutation across requests, not
 model quality).
-`_resolve_roles` is deliberately NOT wired as a FastAPI Depends() (see its
+`resolve_roles` is deliberately NOT wired as a FastAPI Depends() (see its
 own docstring), so tests patch the module attribute directly rather than
 using app.dependency_overrides.
 """
@@ -18,7 +18,8 @@ from smritilila import itihasa
 from smritilila import pravrtti
 from smritilila import adhisthana
 from smritilila import dvara
-from smritilila.routes import spanda
+from smritilila import spanda
+from smritilila import udbhava
 from smritilila.routes import bija as bija_routes
 from smritilila.routes import loka
 
@@ -286,6 +287,21 @@ def test_the_picker_goes_to_a_world_with_a_port_and_no_address_instead_of_asking
     assert "/worlds/select" in page                                                                                # an unpinned registry world still switches
 
 
+def test_the_play_bar_has_the_short_narration_switch_off_by_default_per_character(client: TestClient) -> None:
+    """Marc, 2026-11-09: the switch was taken out on 2026-10-19 and put back. A reading preference kept in the browser, per character, off by default:
+    off, a narration shows whole; on, its pith shows and the whole is folded beneath it (opened whole for a marking or indelible moment). Exercised in a
+    browser on a live page: off whole and pithless, on pith with the fold shut, an indelible moment open, the button flipping and keeping its key per
+    character; here, that the page is wired so, and that the server still sends the pith and the weight the page reads."""
+    page = client.get("/").text
+    assert '<button id="short-toggle" class="toggle-switch" aria-pressed="false"' in page and page.index('id="short-toggle"') < page.index('id="offline-toggle"')
+    assert 'localStorage.getItem("smritilila.shortNarration." + entityId) === "on"' in page      # off unless this character's player turned it on
+    assert "const short = shortNarrationFor(div.dataset.entity);" in page and "fold.open = !short || fold.dataset.weighty === \"1\";" in page
+    assert "detail.weight <= 2" in page and "function applyNarrationMode()" in page
+    assert "async function refreshPlayerControls() {\n  applyNarrationMode();" in page   # a character switch re-applies it to what is on screen
+    fields = schemas.PulseResponse.model_fields
+    assert "sara" in fields and "sara_detail" in fields
+
+
 def test_root_serves_the_web_ui_without_touching_world_state(client: TestClient) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
@@ -341,7 +357,7 @@ def test_an_action_with_nothing_said_is_refused_before_any_model_call(
     monkeypatch.delenv("the second model_API_KEY", raising=False)
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _SmrtiClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     _seed_square_world(client)
     for junk in ("{", "   ", "?!", "...", "}{"):
         r = client.post("/pulses", json={"action_text": junk})
@@ -356,7 +372,7 @@ def test_submit_pulse_without_an_api_key_returns_503_for_an_otherwise_valid_requ
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Explicitly cleared, not just assumed absent: a provider's key can leak into the test process from the real OS environment (e.g. set once
-    # via `setx` for live manual testing), which would make _resolve_roles() construct a real client and fail later with a raw network error
+    # via `setx` for live manual testing), which would make resolve_roles() construct a real client and fail later with a raw network error
     # instead of the clean 503 this test is actually asserting.
     for k in [k for k in os.environ if k.endswith("_API_KEY")] + ["SMRITILILA_LOCAL_BASE_URL", "SMRITILILA_LOCAL_MODEL"]:
         monkeypatch.delenv(k, raising=False)   # no key of any provider, no local model: no narrator
@@ -553,7 +569,7 @@ def test_backup_world_now_returns_502_when_pg_dump_fails(client: TestClient, mon
 
 
 def test_submit_pulse_rejects_an_entity_id_not_in_playable_entity_ids(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: _fake_roles())
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: _fake_roles())
     _seed_square_world(client)
     resp = client.post("/pulses", json={"action_text": "waits", "entity_id": "mara"})
     assert resp.status_code == 422
@@ -576,11 +592,17 @@ class _SmrtiClient:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.births: list[str] = []  # what the engine asked of the birth writer (bija.write_birth) for a being a telling gave its first tuple
 
     def complete(self, system, user, *, max_tokens=8192):  # pragma: no cover
         raise NotImplementedError
 
     def complete_with_tool(self, system, user, *, tool_name, tool_description, input_schema, max_tokens=8192):
+        if tool_name == "write_birth":
+            self.births.append(user)
+            return {"tuples": [{"text": "I was raised on the grey road and learned to keep my own counsel there.", "weight": "notable", "use": "useful"},
+                               {"text": "I believe a stranger is owed a look before a word, and I live to be the one who reads a square first.",
+                                "weight": "indelible", "use": "key"}]}
         self.calls.append(user)
         actor = next(l for l in user.splitlines() if l.startswith("ACTOR: ")).split(": ", 1)[1]
         place = next(l for l in user.splitlines() if l.startswith("SCENE: ")).split(": ", 1)[1]
@@ -599,7 +621,7 @@ def test_smrti_live_mode_runs_the_v3_loop_and_bypasses_the_v2_pipeline(
     smrti_client = _SmrtiClient()
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = smrti_client
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     _seed_square_world(client)
     world = client.app.state.world
     owner = world.scene_owner_entity_id
@@ -624,6 +646,20 @@ def test_smrti_live_mode_runs_the_v3_loop_and_bypasses_the_v2_pipeline(
     # persisted through the store, as memories + a promoted entity, no deltas
     canon, result, _ = fake_store.commit_calls[0]
     assert [e.id for e in result.promoted_entities] == [new_id_]
+    # the stranger was given its first tuple, so the engine wrote its birth (Marc, 2026-11-06, 2026-11-08): one call, shown that first tuple; the
+    # rows are in the SAME commit, one tick before the first, under a pulse id of their own; the player, who had memories already, got none
+    # (this fake's every telling mints a stranger, the scheduler's activation of the first one included: one birth call per telling)
+    assert len(smrti_client.births) == 1 + len(autonomous_calls) and "stranger in a grey cloak" in smrti_client.births[0] \
+        and "Someone near me in the square looks about." in smrti_client.births[0]
+    mine = [m for m in result.memories_written if m.entity_id == new_id_]
+    first = next(m for m in mine if m.experience == "Someone near me in the square looks about.")
+    born = sorted((m for m in mine if m is not first), key=lambda m: m.id)
+    assert len(born) == 2 and {m.world_time for m in born} == {first.world_time - 1} and {m.pulse_id for m in born} == {"birth:" + first.pulse_id}
+    assert [m.salience for m in born] == [4, 1] and [m.use for m in born] == ["useful", "key"] and {m.location_id for m in born} == {first.location_id}
+    assert not [m for m in result.memories_written if m.entity_id == owner and m.pulse_id.startswith("birth:")]
+    # and the live world reads them in order, as a restart would: its name, its beginning, its first tuple
+    assert [t.memory for t in world.samskara().log.stream(new_id_)][:4] == [
+        "stranger in a grey cloak", born[0].experience, born[1].experience, "Someone near me in the square looks about."]
     # a second pulse retrieves the first's tuples: the stranger is now in the memory handed to the Narrator -- by
     # handle, its own words without the minted tail (2026-10-02: one handle rule for every id)
     resp2 = client.post("/pulses", json={"action_text": "greets the stranger"})
@@ -752,6 +788,58 @@ def test_an_overtaken_activation_adopts_what_it_bound_not_only_what_it_minted(
     assert world.recent_memories[-1].id == "m-npc"
 
 
+def test_a_being_with_an_action_in_hand_takes_its_turn_as_a_moment(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_store
+) -> None:
+    # hastagata (Marc, 2026-11-07): a being's last turn's suggested_next_action stays in hand and is its next turn's ACTION, taken as ONE MOMENT
+    # (pulse.kshana: asked for a moment, stamped with the span the gate gave); the first turn, and any turn the gate gave no span, is the span
+    # it always was; a being that suggested nothing has nothing in hand.
+    import asyncio
+    from smritilila.memory.memory import Memory
+    from smritilila.smrti.pulse import SmrtiPulseResult
+    world, _ = _meanwhile_world(client)
+    calls, suggest = [], ["Check the barricade."]
+
+    def turn(canon, actor, action, world_time, pulse_id, mems, *a, **k):
+        calls.append((action, k.get("kshana"), k.get("max_elapsed"), k.get("wait_until")))
+        return SmrtiPulseResult("He loads the cart.", [Memory(f"m-{len(calls)}", actor, frozenset(), "I load the cart.", "PRIMARY", 4, "square",
+                                                              world_time, pulse_id, None)], [], suggest[0], 3, [actor])
+
+    monkeypatch.setattr(spanda, "run_smrti_pulse", turn)
+    monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
+
+    def go(**kw):
+        asyncio.run(spanda._run_smrti_activation_in_background(world, _fake_roles(_SpyNarrator()), "npc", 1, **kw))
+
+    go(begin=100, cap=600)                                   # nothing in hand: the span; its suggestion is kept
+    assert calls[-1] == (None, False, 600, 100) and world.hastagata == {"npc": "Check the barricade."}
+    go(begin=700, cap=500)                                   # the action in hand: a moment, stamped with the span
+    assert calls[-1] == ("Check the barricade.", True, 500, 700)
+    suggest[0] = "Pay the sentries."
+    go()                                                      # the gate gave no span: a span, as ever (the action stays in hand)
+    assert calls[-1] == (None, False, None, None) and world.hastagata == {"npc": "Pay the sentries."}
+    go(begin=900, cap=300)
+    assert calls[-1] == ("Pay the sentries.", True, 300, 900)
+    suggest[0] = "  "                                         # it suggested nothing: nothing in hand, the next turn is a span
+    go(begin=1200, cap=300)
+    assert calls[-1][:2] == ("Pay the sentries.", True) and "npc" not in world.hastagata
+    go(begin=1500, cap=300)
+    assert calls[-1] == (None, False, 300, 1500)
+    # a player the world acts for takes their own turns: nothing is carried for them, and what they hold is left as it was
+    world.hastagata["player"] = "Walk on."
+    asyncio.run(spanda._run_smrti_activation_in_background(world, _fake_roles(_SpyNarrator()), "player", 1, begin=5, cap=60))
+    assert calls[-1] == (None, False, 60, 5) and world.hastagata["player"] == "Walk on."
+    # nor a scene asked whether anyone came, nor the age: their turns are what they were
+    from smritilila.graph.entity import Entity
+    from smritilila.smrti.genesis import ITIHASA
+    world.canon.entities["lane"] = Entity("lane", ["the lane"], 0, "genesis", avarana="scene")
+    world.canon.entities["age"] = Entity("age", ["the age"], 0, ITIHASA)
+    for eid in ("lane", "age"):
+        world.hastagata[eid] = "Hold."
+        asyncio.run(spanda._run_smrti_activation_in_background(world, _fake_roles(_SpyNarrator()), eid, 1, begin=9, cap=60))
+        assert calls[-1][0] is None and calls[-1][1] is False and world.hastagata[eid] == "Hold."
+
+
 def test_a_pulse_changes_only_the_entities_it_binds_or_mints(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_store
 ) -> None:
@@ -772,7 +860,7 @@ def test_a_pulse_changes_only_the_entities_it_binds_or_mints(
     smrti_client = _SmrtiClient()
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = smrti_client
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(spanda, "run_smrti_pulse", watched)
     world, _ = _meanwhile_world(client)
     for action in ("looks around the square", "greets the stranger"):
@@ -817,13 +905,13 @@ def test_smrti_pool_sleeps_a_quiet_scene_no_player_is_near() -> None:
     world.recent_memories += [mem(10 + t, "road", t, "road", "none", "AMBIENT") for t in (7, 8, 9)]
     adhisthana.FAR_EVERY, far = 1, adhisthana.FAR_EVERY  # every tick far, so distance does not decide it
     try:
-        pool = set(pravrtti._smrti_exploration_pool(world))
+        pool = set(pravrtti.smrti_exploration_pool(world))
         assert "drover" not in pool and "mule" not in pool and "ilo" in pool  # the road gave nobody anything: both sleep
         world.recent_memories.append(mem(20, "road", 9, "road", "useful", "AMBIENT"))  # anything of use wakes it
-        assert {"drover", "mule"} <= set(pravrtti._smrti_exploration_pool(world))
+        assert {"drover", "mule"} <= set(pravrtti.smrti_exploration_pool(world))
         world.recent_memories.pop()
         world.recent_memories.append(mem(21, "teo", 9, "road"))  # a player coming into it wakes it
-        assert {"drover", "mule"} <= set(pravrtti._smrti_exploration_pool(world))
+        assert {"drover", "mule"} <= set(pravrtti.smrti_exploration_pool(world))
     finally:
         adhisthana.FAR_EVERY = far
 
@@ -841,11 +929,11 @@ def test_smrti_pool_draws_a_road_at_most_once_in_the_quiet_window() -> None:
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.recent_memories = [Memory("m1", "teo", frozenset(), "x", "PRIMARY", 4, "inn", 1, "p1", None),
                              Memory("m0", "teo", frozenset(), "x", "PRIMARY", 4, "road", 0, "p0", None)]  # Teo lately stood on the road: near
-    assert pravrtti._smrti_exploration_pool(world) == ["road"]          # never asked yet
+    assert pravrtti.smrti_exploration_pool(world) == ["road"]          # never asked yet
     canon.entities["road"].last_simulated_tick = 25
-    assert pravrtti._smrti_exploration_pool(world) == []                # asked 5 ticks ago: quiet
+    assert pravrtti.smrti_exploration_pool(world) == []                # asked 5 ticks ago: quiet
     canon.entities["road"].last_simulated_tick = 10
-    assert pravrtti._smrti_exploration_pool(world) == ["road"]          # 20 ticks ago: may be asked again
+    assert pravrtti.smrti_exploration_pool(world) == ["road"]          # 20 ticks ago: may be asked again
 
 
 def test_the_draws_pool_is_witnessed_with_what_each_last_turn_gave(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -866,7 +954,7 @@ def test_the_draws_pool_is_witnessed_with_what_each_last_turn_gave(monkeypatch: 
                              Memory("m2", "ilo", frozenset(), "I sat.", "PRIMARY", 6, "inn", 5, "p5", None, use="none"),
                              Memory("m3", "ilo", frozenset(), "I slept.", "PRIMARY", 6, "inn", 7, "p7", None, use="none"),
                              Memory("m4", "rat", frozenset(), "I ran.", "PRIMARY", 6, "inn", 4, "p4", None)]
-    pravrtti._log_pool(world, ["ilo", "rat"])
+    pravrtti.log_pool(world, ["ilo", "rat"])
     assert [kw for e, kw in events if e == "tick.pool"] == [{"tick": 9, "pool": [["ilo", 5, ["key", "none"]], ["rat", None, []]]}]
 
 
@@ -887,9 +975,9 @@ def test_smrti_pool_draws_far_actors_only_every_eighth_tick() -> None:
     world = WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["inn"], playable_entity_ids=["teo"])
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.recent_memories = [mem(1, "teo", 70, "inn"), mem(2, "ilo", 71, "inn"), mem(3, "drover", 76, "market"), mem(4, "seller", 76, "market")]
-    assert set(pravrtti._smrti_exploration_pool(world)) == {"ilo"}            # tick 77: far actors wait
+    assert set(pravrtti.smrti_exploration_pool(world)) == {"ilo"}            # tick 77: far actors wait
     canon.world_time = 80
-    assert set(pravrtti._smrti_exploration_pool(world)) == {"ilo", "drover", "seller", "market"}  # a far tick -- and the quiet market is asked whether anyone came (v5 §38)
+    assert set(pravrtti.smrti_exploration_pool(world)) == {"ilo", "drover", "seller", "market"}  # a far tick -- and the quiet market is asked whether anyone came (v5 §38)
 
 
 def test_a_branch_that_keeps_its_own_pace_breathes_with_no_player_near() -> None:
@@ -914,10 +1002,10 @@ def test_a_branch_that_keeps_its_own_pace_breathes_with_no_player_near() -> None
     world.world_data["pacing"] = {"arrivals_on_traffic": False}
     world.recent_memories = [mem(1, "teo", 70, "inn"), mem(2, "ilo", 71, "inn"), mem(3, "drover", 76, "market"),
                              mem(4, "market", 76, "market", "none"), mem(5, "market", 75, "market", "none"), mem(6, "market", 74, "market", "none")]
-    assert "drover" not in pravrtti._smrti_exploration_pool(world)                  # tick 77: far, the world's pace
+    assert "drover" not in pravrtti.smrti_exploration_pool(world)                  # tick 77: far, the world's pace
     world.records = [Record("r1", "prakriti", "market", json.dumps({"far_every": 1}), 1, "p1", "pacing")]
     world._samskara = None
-    assert "drover" in pravrtti._smrti_exploration_pool(world)                      # the market breathes: drawn now
+    assert "drover" in pravrtti.smrti_exploration_pool(world)                      # the market breathes: drawn now
 
 
 def test_smrti_pool_admits_a_thing_the_world_gave_a_stream() -> None:
@@ -935,7 +1023,7 @@ def test_smrti_pool_admits_a_thing_the_world_gave_a_stream() -> None:
     world = WorldSession(canon=canon, scene_owner_entity_id="wind", entry_point_location_ids=["saloon"], playable_entity_ids=["wind"])
     world.recent_memories = [Memory("m1", "wind", frozenset(), "x", "PRIMARY", 4, "saloon", 1, "p1", None),
                              Memory("m2", "money", frozenset(), "x", "PRIMARY", 4, "saloon", 2, "p2", None)]
-    assert pravrtti._smrti_exploration_pool(world) == ["money"]
+    assert pravrtti.smrti_exploration_pool(world) == ["money"]
 
 
 def test_a_player_witnesses_the_place_tuple_of_a_turn_taken_where_they_stand(
@@ -969,7 +1057,7 @@ def test_a_player_witnesses_the_place_tuple_of_a_turn_taken_where_they_stand(
     monkeypatch.setattr(main, "log_event", lambda event, **f: None)
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _SmrtiClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     asyncio.run(spanda._run_smrti_activation_in_background(world, roles, "corwin", 1))
     assert world.pending_witnessed == {owner: [{"place": "Corwin's lab",
         "text": "The biologist set down his scalpel and demanded the transcript be produced that night.", "said": "", "said_by": "", "world_time": t0 + 1}]}
@@ -1001,18 +1089,18 @@ def test_a_waiting_player_takes_no_turn_until_someone_touches_them() -> None:
     world = WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["inn"], playable_entity_ids=["teo"])
     world.autonomous, world.logged_off, world.waiting = {"teo"}, {"teo"}, {"teo"}
     world.recent_memories = [Memory("m1", "teo", frozenset(), "I eased down by the fire.", "PRIMARY", 4, "inn", 5, "p5", None)]
-    assert "teo" not in world.absent() and pravrtti._smrti_exploration_pool(world) == []
+    assert "teo" not in world.absent() and pravrtti.smrti_exploration_pool(world) == []
     # his own player's pulse after the mark is not a touch
     world.recent_memories.append(Memory("m2", "teo", frozenset(), "I rubbed my ribs.", "PRIMARY", 4, "inn", 7, "p7", None))
     world.records = [Record("a7", "action", "teo", "I rub my ribs.", 7, "p7", note="typed")]
     world._samskara = None
-    assert pravrtti._smrti_exploration_pool(world) == []
+    assert pravrtti.smrti_exploration_pool(world) == []
     # someone else's pulse writes him a tuple: awake
     world.recent_memories.append(Memory("m3", "teo", frozenset(), "Ilo asked me to check the lines.", "PRIMARY", 4, "inn", 8, "p8", None))
     world._samskara = None
-    assert pravrtti._smrti_exploration_pool(world) == ["teo"]
+    assert pravrtti.smrti_exploration_pool(world) == ["teo"]
     world.waiting = set()  # active: drawn as before, touched or not
-    assert pravrtti._smrti_exploration_pool(world) == ["teo"]
+    assert pravrtti.smrti_exploration_pool(world) == ["teo"]
 
 
 def test_waiting_is_set_through_the_toggle_and_kept(client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_store) -> None:
@@ -1049,18 +1137,18 @@ def test_smrti_pool_draws_among_those_engaged_in_the_players_scene_first() -> No
     world = WorldSession(canon=canon, scene_owner_entity_id="teo", entry_point_location_ids=["landing"], playable_entity_ids=["teo"])
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.recent_memories = [mem(1, "marren", 40, "inn"), mem(2, "teo", 59, "landing"), mem(3, "ilo", 59, "landing"), mem(4, "landing", 59, "landing")]
-    assert pravrtti._smrti_exploration_pool(world) == ["ilo"]   # engaged: wrote a tuple where the player acted, in that pulse
+    assert pravrtti.smrti_exploration_pool(world) == ["ilo"]   # engaged: wrote a tuple where the player acted, in that pulse
     # a near road past its quiet window interrupts the scene
     canon.entities["road"].last_simulated_tick = None
     world.recent_memories.append(mem(9, "teo", 45, "road"))  # Teo lately stood on the road: near
-    assert pravrtti._smrti_exploration_pool(world) == ["road"]
+    assert pravrtti.smrti_exploration_pool(world) == ["road"]
     canon.entities["road"].last_simulated_tick = 58          # asked lately: the scene keeps the draw
-    assert pravrtti._smrti_exploration_pool(world) == ["ilo"]
+    assert pravrtti.smrti_exploration_pool(world) == ["ilo"]
     world.recent_memories.pop()
     # nobody engaged (the player stood alone): the ordinary pool, roads last
     world.recent_memories = [mem(1, "marren", 40, "inn"), mem(2, "teo", 59, "landing"), mem(4, "landing", 59, "landing"), mem(5, "ilo", 50, "inn")]
     canon.world_time = 64  # a far tick: the inn is not where the player lately stood
-    assert set(pravrtti._smrti_exploration_pool(world)) >= {"marren", "ilo"}
+    assert set(pravrtti.smrti_exploration_pool(world)) >= {"marren", "ilo"}
 
 
 class _BijaClient(_SmrtiClient):
@@ -1112,6 +1200,8 @@ class _BijaClient(_SmrtiClient):
                     "tuples": [{"text": "I have walked the north road with my pack of pins for eleven years.", "weight": "weighty"},
                                {"text": "I came down to the ford this morning and found a girl waiting there.", "weight": "ordinary"}],
                     "place_tuple": "A tinker came down the north road to the ford with a pack on his back."}
+        if tool_name == "write_birth":
+            return {}  # too short a beginning: the builder's people go without here (the births themselves are tests/test_birth.py's)
         return super().complete_with_tool(system, user, tool_name=tool_name, tool_description=tool_description, input_schema=input_schema)
 
 
@@ -1123,7 +1213,7 @@ def test_a_newcomer_may_describe_where_they_start(client: TestClient, monkeypatc
     region within the world closed to strangers."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river, high summer.", "breadth": "here"})
@@ -1134,7 +1224,7 @@ def test_a_newcomer_may_describe_where_they_start(client: TestClient, monkeypatc
     hob = r.json()["player_entity_id"]
     assert {m.location_id for m in world.recent_memories if m.entity_id == hob} == {ford}  # the place it is, not a second
     places = sum(1 for e in world.canon.entities.values() if e.avarana)
-    monkeypatch.setattr(spanda, "_nearest_players_clock", lambda w, start, new_place=False: 4242)  # the nearest online player's time (v5.24)
+    monkeypatch.setattr(spanda, "nearest_players_clock", lambda w, start, new_place=False: 4242)  # the nearest online player's time (v5.24)
     r = client.post("/world/join", json={"self_description": "I am Ann.", "start_description": "in a hut of willow above the water"})
     assert r.status_code == 200, r.text
     ann = r.json()["player_entity_id"]
@@ -1159,7 +1249,7 @@ def test_a_newcomer_may_describe_where_they_start(client: TestClient, monkeypatc
 
 
 def _join_world(clocks: dict, standing: dict, online: set, up: dict):
-    """A stand-in world for spanda._nearest_players_clock: `clocks` player -> minute, `standing` player -> scene, `up` scene -> its
+    """A stand-in world for spanda.nearest_players_clock: `clocks` player -> minute, `standing` player -> scene, `up` scene -> its
     containers nearest first, `online` the players who are."""
     class K:
         def scene_of(self, p, t):
@@ -1196,24 +1286,24 @@ def test_a_newcomer_joins_at_the_clock_of_the_nearest_online_player_in_the_tree(
     clocks = {"filonius": 12934, "elivian": 12938, "aeon": 12959}
     standing = {"filonius": "common_room", "elivian": "common_room", "aeon": "courtyard"}
     w = _join_world(clocks, standing, {"filonius", "elivian", "aeon"}, up)
-    assert spanda._nearest_players_clock(w, "common_room") == 12938    # the two in the room: the later of them, not the far traveller's
+    assert spanda.nearest_players_clock(w, "common_room") == 12938    # the two in the room: the later of them, not the far traveller's
     # counter-test: the old rule, the furthest along player anywhere, is exactly what put the newcomer 25 minutes out
     assert max(clocks.values()) == 12959
     # a free-text place planted in the common room: one level further, the same players are nearest
-    assert spanda._nearest_players_clock(w, "common_room", new_place=True) == 12938
+    assert spanda.nearest_players_clock(w, "common_room", new_place=True) == 12938
     # a place in the inn, beside the common room: the room's players are still nearer than the courtyard's
     up["parlour"] = ["inn", "millhaven", "county"]
-    assert spanda._nearest_players_clock(w, "parlour") == 12938
+    assert spanda.nearest_players_clock(w, "parlour") == 12938
     # a player who is away is not counted: their clock is stale (Elivian's page is closed)
-    assert spanda._nearest_players_clock(_join_world(clocks, standing, {"filonius", "aeon"}, up), "common_room") == 12934
+    assert spanda.nearest_players_clock(_join_world(clocks, standing, {"filonius", "aeon"}, up), "common_room") == 12934
     # nobody near: the tree reaches a shared container (the county) and the nearest of the far ones decides, not the furthest
     up["inn"] = ["millhaven", "county"]
     far = _join_world({"aeon": 12959, "wren": 12800}, {"aeon": "courtyard", "wren": "inn"}, {"aeon", "wren"}, up)
-    assert spanda._nearest_players_clock(far, "common_room") == 12800   # Wren, in the inn above the room, is nearer than Aeon: not the furthest along
+    assert spanda.nearest_players_clock(far, "common_room") == 12800   # Wren, in the inn above the room, is nearer than Aeon: not the furthest along
     # no one online: all the players are read instead, and there is still an answer
-    assert spanda._nearest_players_clock(_join_world(clocks, standing, set(), up), "common_room") == 12938
+    assert spanda.nearest_players_clock(_join_world(clocks, standing, set(), up), "common_room") == 12938
     # no players at all: no clock (the place's own time then stands, in the caller)
-    assert spanda._nearest_players_clock(_join_world({}, {}, set(), up), "common_room") is None
+    assert spanda.nearest_players_clock(_join_world({}, {}, set(), up), "common_room") is None
 
 
 def test_v3_genesis_plants_the_narrators_seed_and_join_adds_a_newcomer(
@@ -1224,7 +1314,7 @@ def test_v3_genesis_plants_the_narrators_seed_and_join_adds_a_newcomer(
     relations or deltas; a newcomer joins at a place a story already is."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     resp = client.post("/genesis", json={"self_description": "I am Wren, the miller's daughter.", "setting": "A mill on a river.", "breadth": "wide"})
@@ -1323,7 +1413,7 @@ def test_a_world_from_a_brief_waits_for_its_first_arrival(
     from its busiest places and becomes its first player."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BriefClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     assert client.post("/genesis", json={"name": "The Mill", "breadth": "here"}).status_code == 422  # where and when is required
@@ -1333,7 +1423,7 @@ def test_a_world_from_a_brief_waits_for_its_first_arrival(
                                          "different": "Ossur the godi is a woman", "breadth": "here"})
     assert resp.status_code == 200, resp.text
     assert resp.json()["player_entity_id"] == "" and resp.json()["narrations"] == {}
-    ask = roles.smrti_client.calls[-1]
+    ask = next(c for c in roles.smrti_client.calls if "WORLD NAME:" in c)   # the seed's ask; its people's birth memories are asked after it (2026-11-08)
     assert "WORLD NAME: The Mill" in ask and "WHAT IS DIFFERENT HERE: Ossur the godi is a woman" in ask and "WHERE IT BEGINS: not given" in ask
     assert ask.index("SOURCE: History: the Icelandic Commonwealth") < ask.index("WHERE AND WHEN")   # the source leads the brief
     assert client.app.state.world.world_data["source"] == "History: the Icelandic Commonwealth" and fake_store._view[2]["source"]
@@ -1371,7 +1461,7 @@ def test_a_world_born_without_its_age_is_given_one_once(
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
     roles.smrti_client.no_account = True  # below wide the account is written after the seed (2026-10-05); here it fails
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     resp = client.post("/genesis", json={"self_description": "I am Wren, the miller's daughter.", "setting": "A mill on a river.", "breadth": "here"})
@@ -1410,7 +1500,7 @@ def test_below_wide_the_world_at_large_follows_the_seed_and_at_wide_it_comes_fir
     from smritilila.smrti.genesis import ITIHASA
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     resp = client.post("/genesis", json={"self_description": "I am Wren, the miller's daughter.", "setting": "A mill on a river.", "breadth": "here"})
@@ -1445,7 +1535,7 @@ def test_a_world_from_a_brief_has_its_account_written_after_the_seed(
     the ask for the world at large, and the seed was written without one."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BriefClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     resp = client.post("/genesis", json={"name": "The Mill", "source": "History: the Icelandic Commonwealth", "where_when": "Iceland, 1120",
@@ -1486,18 +1576,18 @@ def test_smrti_pool_asks_a_far_road_only_on_far_ticks() -> None:
     world = WorldSession(canon=canon, scene_owner_entity_id="halla", entry_point_location_ids=["racks"], playable_entity_ids=["halla"])
     world.world_data["pacing"] = {"arrivals_on_traffic": False}  # asked on the clock: the ask itself, not its traffic gate
     world.recent_memories = [Memory("m1", "halla", frozenset(), "x", "PRIMARY", 4, "racks", 1, "p1", None)]
-    assert pravrtti._smrti_exploration_pool(world) == []                # tick 30: far, waits
+    assert pravrtti.smrti_exploration_pool(world) == []                # tick 30: far, waits
     canon.world_time = 32
-    assert pravrtti._smrti_exploration_pool(world) == ["althing_road"]  # a far tick
+    assert pravrtti.smrti_exploration_pool(world) == ["althing_road"]  # a far tick
 
 
 def test_new_world_slug_and_registry(tmp_path) -> None:
     """POST /worlds/create (2026-09-20): a database name from the world's
     name, and the registry appended without touching other entries."""
     from smritilila.worlds_registry import add_world, load_worlds_registry
-    assert loka._db_slug("Eyrarfjörður, 1120") == "smritilila_eyrarfjorur_1120"
-    assert loka._db_slug("The Shire -- Bywater, 3018") == "smritilila_the_shire_bywater_3018"
-    assert loka._db_slug("!!!") == "smritilila_world"
+    assert adhisthana._db_slug("Eyrarfjörður, 1120") == "smritilila_eyrarfjorur_1120"
+    assert adhisthana._db_slug("The Shire -- Bywater, 3018") == "smritilila_the_shire_bywater_3018"
+    assert adhisthana._db_slug("!!!") == "smritilila_world"
     cfg = tmp_path / "worlds.json"
     cfg.write_text('{"worlds": [{"name": "Tombstone 1880", "database_url": "postgresql+asyncpg://a:a@h/smritilila"}]}', encoding="utf-8")
     add_world("Bywater, 3018", "postgresql+asyncpg://a:a@h/smritilila_bywater_3018", path=cfg)
@@ -1531,12 +1621,12 @@ def test_the_chronicle_is_drawn_on_far_ticks_and_a_road_hears_its_news(client: T
     world.bhuvana = "THE YEAR. 3018. THE REGIONS. Bree. THE CENTRAL FIGURES. A Steward far south."
     world.recent_memories = [mem(1, "amaranth", 30, "bree"), mem(2, "age", 0, "nowhere", "It is 3018 and the Nine have ridden out.")]
     # tick 32 is a far tick and the age has never moved: it takes the draw alone; at 34 it is not in the pool
-    assert pravrtti._smrti_exploration_pool(world) == ["age"]
+    assert pravrtti.smrti_exploration_pool(world) == ["age"]
     canon.world_time = 34
-    assert "age" not in pravrtti._smrti_exploration_pool(world)
+    assert "age" not in pravrtti.smrti_exploration_pool(world)
     canon.world_time = 32
     canon.entities["age"].last_simulated_tick = 20  # moved 12 ticks ago: waits its window, competes as a far actor
-    assert pravrtti._smrti_exploration_pool(world) != ["age"] and "age" in pravrtti._smrti_exploration_pool(world)
+    assert pravrtti.smrti_exploration_pool(world) != ["age"] and "age" in pravrtti.smrti_exploration_pool(world)
     canon.entities["age"].last_simulated_tick = None
     # its turn: the chronicle action carries the bhuvana; it writes one tuple standing nowhere
     calls: list[str] = []
@@ -1550,8 +1640,8 @@ def test_the_chronicle_is_drawn_on_far_ticks_and_a_road_hears_its_news(client: T
     roles = _fake_roles(_SpyNarrator()); roles.smrti_client = _SmrtiClient()
     asyncio.run(spanda._run_smrti_activation_in_background(world, roles, "age", 1))
     assert calls[-1][0] == "age" and calls[-1][1] == world.bhuvana and calls[-1][2] is None
-    assert itihasa._age_at(world, None)[0][-1] == "The Steward sent his son north."  # a world keeping no clock: every entry is reached
-    assert "THE CHRONICLE SINCE" in itihasa._at_large(world) and "sent his son north" in itihasa._at_large(world)
+    assert itihasa.age_at(world, None)[0][-1] == "The Steward sent his son north."  # a world keeping no clock: every entry is reached
+    assert "THE CHRONICLE SINCE" in itihasa.at_large(world) and "sent his son north" in itihasa.at_large(world)
     # a road's turn is told the news
     asyncio.run(spanda._run_smrti_activation_in_background(world, roles, "east_road", 1))
     assert calls[-1][0] == "east_road" and calls[-1][1] is None and calls[-1][2] == "The Steward sent his son north."
@@ -1616,17 +1706,17 @@ def test_the_chronicle_runs_ahead_but_a_scene_is_shown_it_by_its_own_time(monkey
     assert k.tick_minute.get(31) is None and k.clock("age") is None and world.samskara().age["p32"] == (START + 34 * D, START + 64 * D)
     assert Kala.of(world.world_data["clock"], world.records).tick_minute.get(31) == START + 34 * D  # (without aside, it would)
     # the inn in April: the year as news, May as the pull; in mid-May, the same; in June, May is news and June the pull
-    assert itihasa._age_at(world, START + 60) == (["THE YEAR. 1928, spring."], "MAY. The river rose.")
-    assert itihasa._age_at(world, START + 35 * D)[0][-1] == "MAY. The river rose." and itihasa._age_at(world, START + 35 * D)[1] == "JUNE. The mill burned."
-    assert itihasa._age_at(world, None)[1] is None                       # a world keeping no clock: every entry reached
-    at_large = itihasa._at_large(world, START + 60)
+    assert itihasa.age_at(world, START + 60) == (["THE YEAR. 1928, spring."], "MAY. The river rose.")
+    assert itihasa.age_at(world, START + 35 * D)[0][-1] == "MAY. The river rose." and itihasa.age_at(world, START + 35 * D)[1] == "JUNE. The mill burned."
+    assert itihasa.age_at(world, None)[1] is None                       # a world keeping no clock: every entry reached
+    at_large = itihasa.at_large(world, START + 60)
     assert "THE CHRONICLE SINCE" not in at_large and "THE AGE'S PULL" in at_large and "river rose" in at_large
     # the next entry begins where the age has reached; it waits while more than a season ahead
-    assert itihasa._age_clock(world) == START + 64 * D and 64 * D - 60 < AGE_LEAD
-    assert pravrtti._kala_gate(world, ["age"])[0] == ["age"]
+    assert itihasa.age_clock(world) == START + 64 * D and 64 * D - 60 < AGE_LEAD
+    assert pravrtti.kala_gate(world, ["age"])[0] == ["age"]
     world.records.append(Record("a3", "time", "age", str(START + 200 * D), 33, "p33", note=f"{START + 64 * D}||"))
     world.recent_memories.append(mem(5, "age", 33, "nowhere", "AUTUMN.", "p33"))
-    assert pravrtti._kala_gate(world, ["age"])[0] == []
+    assert pravrtti.kala_gate(world, ["age"])[0] == []
     # the chronicle's own turn: told the age's time, it writes the span it covers
     class Chron:
         def complete_with_tool(self, system, user, **kw):
@@ -1678,14 +1768,14 @@ def test_a_room_pauses_around_a_player_who_is_away(monkeypatch: pytest.MonkeyPat
     world.last_seen["nat"] = _time.monotonic()  # Nathaniel is playing; Wentworth has not been seen
     pool = ["aunt", "kettle", "parlour", "boatman", "shanty"]
     assert pravrtti._paused(world) == {"parlour"}
-    assert pravrtti._hold_for_away(world, pool) == ["boatman", "shanty"]
+    assert pravrtti.hold_for_away(world, pool) == ["boatman", "shanty"]
     world.logged_off.add("wen")  # out of the world now: the room still holds for him
-    assert pravrtti._hold_for_away(world, pool) == ["boatman", "shanty"]
+    assert pravrtti.hold_for_away(world, pool) == ["boatman", "shanty"]
     world.autonomous.add("wen")  # he lets the world act for him: the room goes on
-    assert pravrtti._hold_for_away(world, pool) == pool
+    assert pravrtti.hold_for_away(world, pool) == pool
     world.autonomous.discard("wen"); world.logged_off.discard("wen")
     world.last_seen["wen"] = _time.monotonic()  # back: the room goes on
-    assert pravrtti._hold_for_away(world, pool) == pool
+    assert pravrtti.hold_for_away(world, pool) == pool
 
 
 def test_absorb_makes_two_ids_one_and_reloads(client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_store) -> None:
@@ -1761,25 +1851,25 @@ def test_the_scene_takes_the_draw_on_every_second_player_pulse_and_a_witnessed_t
     # tick 59: the player acts in the lab; Corwin and Hartley write there -> engaged, the scene's draw
     world.recent_memories = [mem(1, "farmer", 30, "far"), mem(2, "nat", 59, "lab"), mem(3, "corwin", 59, "lab"), mem(4, "hartley", 59, "lab"), mem(5, "lab", 59, "lab", tier="AMBIENT")]
     canon.world_time = 60
-    assert set(pravrtti._smrti_exploration_pool(world)) == {"corwin", "hartley"}
-    assert set(pravrtti._smrti_exploration_pool(world)) == {"corwin", "hartley"}  # the same tick re-asked answers the same
+    assert set(pravrtti.smrti_exploration_pool(world)) == {"corwin", "hartley"}
+    assert set(pravrtti.smrti_exploration_pool(world)) == {"corwin", "hartley"}  # the same tick re-asked answers the same
     # tick 60: Corwin's activation; its place tuple is filed as the player's (witnessed) -- NOT a player pulse
     world.recent_memories += [mem(6, "corwin", 60, "lab", "Corwin read the ledger."), mem(7, "lab", 60, "lab", "The man read the ledger.", "AMBIENT", "pc60"),
                               mem(8, "nat", 60, "lab", "The man read the ledger.", "PRIMARY", "pc60")]
     # tick 61: the player's next own pulse at the lab -> the scene WAITS; the rest of the world has the draw
     world.recent_memories += [mem(9, "nat", 61, "lab"), mem(10, "corwin", 61, "lab"), mem(11, "lab", 61, "lab", tier="AMBIENT")]
     canon.world_time = 62
-    pool = pravrtti._smrti_exploration_pool(world)
+    pool = pravrtti.smrti_exploration_pool(world)
     assert "corwin" not in pool and "hartley" not in pool
     # the player's very next pulse (no tick was spent: nobody else acted) -> the scene's draw again: player pulses count, not ticks
     world.recent_memories += [mem(12, "nat", 62, "lab"), mem(13, "corwin", 62, "lab"), mem(14, "lab", 62, "lab", tier="AMBIENT")]
     canon.world_time = 63
-    assert pravrtti._smrti_exploration_pool(world) == ["corwin"]
+    assert pravrtti.smrti_exploration_pool(world) == ["corwin"]
     # and had the witnessed tuple counted as a player pulse, "engaged" at 60 would have been Corwin alone by his own act
     world.scene_draws.clear()
     world.recent_memories = world.recent_memories[:8]
     canon.world_time = 61
-    assert set(pravrtti._smrti_exploration_pool(world)) == {"corwin", "hartley"}  # still those who wrote beside the player's OWN 59 pulse
+    assert set(pravrtti.smrti_exploration_pool(world)) == {"corwin", "hartley"}  # still those who wrote beside the player's OWN 59 pulse
 
 
 def test_the_world_stamp_can_never_stop_the_server_starting(tmp_path, monkeypatch) -> None:
@@ -1811,15 +1901,15 @@ def test_a_player_chooses_whether_the_world_may_act_for_them(client: TestClient,
     world.recent_memories.append(Memory("m-mara", "mara", frozenset(), "I crossed the square.", "PRIMARY", 5, "square", 0, "p0", None))
     assert client.get("/players").json() == [{"entity_id": "player", "label": "the player", "autonomous": False, "online": False, "waiting": False}]
     assert world.unvoiced() == frozenset({"player"}) and world.movable() == frozenset()
-    assert "player" not in pravrtti._smrti_exploration_pool(world)  # offline, off: suspended
+    assert "player" not in pravrtti.smrti_exploration_pool(world)  # offline, off: suspended
     r = client.post("/players/player/autonomy", json={"allow": True})
     assert r.status_code == 200 and r.json()["autonomous"] is True and fake_store._autonomy == ["player"]
     assert world.movable() == frozenset({"player"})
     # offline and allowing it: voiced, and waiting -- not drawn until someone's pulse writes them one (v4.58)
-    assert world.unvoiced() == frozenset() and world.waiting == {"player"} and "player" not in pravrtti._smrti_exploration_pool(world)
+    assert world.unvoiced() == frozenset() and world.waiting == {"player"} and "player" not in pravrtti.smrti_exploration_pool(world)
     # back online: movable still, but not voiced by another's turn and not drawn
     assert client.post("/players/player/presence", json={"online": True}).json()["online"] is True
-    assert world.unvoiced() == frozenset({"player"}) and "player" not in pravrtti._smrti_exploration_pool(world)
+    assert world.unvoiced() == frozenset({"player"}) and "player" not in pravrtti.smrti_exploration_pool(world)
     assert client.post("/players/player/presence", json={"online": False}).json()["online"] is False
     assert client.post("/players/nobody/autonomy", json={"allow": True}).status_code == 404
 
@@ -1840,9 +1930,9 @@ def test_a_heartbeat_keeps_a_player_online_but_never_brings_one_back(client: Tes
     assert "player" in world.logged_off and world.presence["player"] == "offline"          # a log-off holds
     assert world.last_seen["player"] == seen and "player" not in world.returning           # no return narrated
     assert client.post("/players/nobody/heartbeat").status_code == 404
-    monkeypatch.setattr(dvara, "_guest", lambda request: "guest@example.com")
-    monkeypatch.setattr(dvara, "_plays", lambda w, guest, pid: False)
-    monkeypatch.setattr(dvara, "_god_of_active", lambda guest: False)
+    monkeypatch.setattr(dvara, "guest_of", lambda request: "guest@example.com")
+    monkeypatch.setattr(dvara, "plays", lambda w, guest, pid: False)
+    monkeypatch.setattr(dvara, "god_of_active", lambda guest: False)
     assert client.post("/players/player/heartbeat").status_code == 403                     # not their character
 
 
@@ -1860,7 +1950,7 @@ def test_a_beat_keeps_a_waiting_player_online_and_only_an_action_makes_them_acti
 
     roles = _fake_roles()
     roles.smrti_client = object()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(spanda, "run_smrti_pulse", lambda *a, **k: SmrtiPulseResult(
         narration="n", memories_written=[], new_entities=[], suggested_next_action="", context_tuples=0, bound_ids=[]))
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
@@ -1878,8 +1968,8 @@ def test_a_being_the_world_holds_is_made_playable_and_waits(client: TestClient, 
     r = client.post("/world/playable/mara")
     assert r.status_code == 200 and r.json() == {"entity_id": "mara", "label": "Mara Fenn", "autonomous": True, "online": False, "waiting": True}
     assert "mara" in world.playable_entity_ids and fake_store._autonomy == ["mara"] and "mara" in fake_store._logged_off
-    assert "mara" not in world.unvoiced() and "mara" not in pravrtti._smrti_exploration_pool(world)  # voiced; waiting, not drawn
-    assert "mara" not in sangama._round_members(world, sangama._reach_key(world.kosha(), "square", world.canon.world_time + 1))
+    assert "mara" not in world.unvoiced() and "mara" not in pravrtti.smrti_exploration_pool(world)  # voiced; waiting, not drawn
+    assert "mara" not in sangama.round_members(world, sangama.reach_key(world.kosha(), "square", world.canon.world_time + 1))
     assert client.post("/players/mara/presence", json={"online": True}).json()["online"] is True
     assert "mara" in world.unvoiced()                                                      # played now: her own
     assert client.post("/world/playable/square").status_code == 404                       # a scene is no one to play
@@ -2025,7 +2115,7 @@ def test_a_logged_off_player_is_out_of_the_world_and_their_return_is_narrated(
                                 context_tuples=0, bound_ids=[])
     roles = _fake_roles()
     roles.smrti_client = object()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(spanda, "run_smrti_pulse", fake_pulse)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     monkeypatch.setattr(main, "_select_for_activation", lambda *a, **k: None, raising=False)
@@ -2046,7 +2136,7 @@ def test_a_join_asked_again_is_the_same_newcomer_and_a_borne_name_is_refused(
     bear a name someone in the world already bears is refused and not written, as an expansion refuses one."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river.", "breadth": "here"})
@@ -2073,7 +2163,7 @@ def test_a_join_folds_in_at_the_places_time_witnessed_and_seen(client: TestClien
     from smritilila.memory.memory import Memory
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     wren = client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river.", "breadth": "here"}).json()["player_entity_id"]
@@ -2132,7 +2222,7 @@ def test_a_newcomer_is_written_under_the_worlds_own_view(client: TestClient, mon
     could be born contradicting what every later pulse is shown."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river.", "breadth": "here"})
@@ -2149,7 +2239,7 @@ def test_an_arrival_naming_a_player_is_counted_as_a_pulse_would_be(client: TestC
     its prose can name one -- counted (smrti.player_named), never blocked."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     wren = client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river.", "breadth": "here"}).json()["player_entity_id"]
@@ -2203,7 +2293,7 @@ def test_two_players_together_see_each_others_turns_as_they_happen(
     monkeypatch.setattr(spanda, "advance_world_tick", lambda *a, **k: type("T", (), {"pulses_run": 0, "activated_entity_id": None})())
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _SmrtiClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     resp = client.post("/pulses", json={"action_text": "I offer my sword.", "entity_id": "mara"})
     assert resp.status_code == 200, resp.text
     assert [w["text"] for w in world.pending_witnessed.get("player", [])] == ["A newcomer offered her sword in the square."]
@@ -2245,7 +2335,7 @@ def _round_world(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(spanda, "advance_world_tick", lambda *a, **k: type("T", (), {"pulses_run": 0, "activated_entity_id": None})())
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _SmrtiClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     return world, calls
 
 
@@ -2317,9 +2407,9 @@ def test_the_world_waits_in_a_scene_with_a_round_open(client: TestClient, monkey
         "is_scene": staticmethod(lambda e: e == "square"), "scene_of": staticmethod(lambda e, t: {"tom": "square"}.get(e, "road")),
         "container_at": staticmethod(lambda e, t: None),
         "across": staticmethod(lambda s, t: [])})())  # a round's key is the scene, and what a boundary joins to it
-    assert pravrtti._hold_for_rounds(world, ["tom", "far"]) == ["tom", "far"]
+    assert pravrtti.hold_for_rounds(world, ["tom", "far"]) == ["tom", "far"]
     world.rounds["square"] = {"actions": {"mara": "x"}, "sources": {}, "order": ["mara"], "running": False}
-    assert pravrtti._hold_for_rounds(world, ["tom", "far"]) == ["far"]
+    assert pravrtti.hold_for_rounds(world, ["tom", "far"]) == ["far"]
 
 
 def test_the_jump_question_carries_its_minutes_and_its_end_as_numbers() -> None:
@@ -2454,15 +2544,15 @@ def test_a_perceiver_whose_own_turn_gave_nothing_sleeps_until_touched(client: Te
     world.recent_memories.append(Memory("d1", "dart", frozenset(), "I was thrown into the mud.", "PRIMARY", 5, "square", 3, "p3", None))
     world.recent_memories.append(Memory("d2", "dart", frozenset(), "I lay still in the mud.", "PRIMARY", 6, "square", 6, "p6", None, "none"))
     world.canon.world_time = 7
-    assert "dart" not in pravrtti._smrti_exploration_pool(world)
+    assert "dart" not in pravrtti.smrti_exploration_pool(world)
     # the room's doings, written to it by a player's pulse (habitual, use none), are not handling (Marc, 2026-10-28)
     world.recent_memories.append(Memory("d3", "dart", frozenset(), "Boots crossed the square.", "PRIMARY", 6, "square", 7, "p7", None, "none"))
     world.canon.world_time = 8
-    assert "dart" not in pravrtti._smrti_exploration_pool(world)
+    assert "dart" not in pravrtti.smrti_exploration_pool(world)
     # handled again: a player's pulse writes it a tuple that matters
     world.recent_memories.append(Memory("d4", "dart", frozenset(), "A hand pulled me from the mud.", "PRIMARY", 5, "square", 8, "p8", None, "useful"))
     world.canon.world_time = 9
-    assert "dart" in pravrtti._smrti_exploration_pool(world)
+    assert "dart" in pravrtti.smrti_exploration_pool(world)
 
 
 def test_what_wakes_a_sleeper_is_a_tuple_that_matters_or_a_move_and_not_the_rooms_copy(client: TestClient, fake_store) -> None:
@@ -2490,13 +2580,13 @@ def test_what_wakes_a_sleeper_is_a_tuple_that_matters_or_a_move_and_not_the_room
         return world
 
     for after in ((), ((7, "none"),), ((6, "none"), (5, "none"), (4, "none"))):    # nothing, or only the room's copies
-        assert "dart" not in pravrtti._smrti_exploration_pool(sleeper(*after)), after
+        assert "dart" not in pravrtti.smrti_exploration_pool(sleeper(*after)), after
     for after in (((3, "none"),), ((1, "none"),), ((6, "useful"),), ((7, "key"),), ((7, "none"), (7, "none"), (3, "none"))):
-        assert "dart" in pravrtti._smrti_exploration_pool(sleeper(*after)), after  # weighty or kept, among copies or alone
-    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper(own=2))            # its own turn is judged by use as before: a weighty mood still sleeps
-    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper((7, "none"), own=1))
-    assert "dart" not in pravrtti._smrti_exploration_pool(sleeper((7, "none")))      # the control of the move: the same copy, nothing moved
-    assert "dart" in pravrtti._smrti_exploration_pool(sleeper((7, "none"), moved=True))
+        assert "dart" in pravrtti.smrti_exploration_pool(sleeper(*after)), after  # weighty or kept, among copies or alone
+    assert "dart" not in pravrtti.smrti_exploration_pool(sleeper(own=2))            # its own turn is judged by use as before: a weighty mood still sleeps
+    assert "dart" not in pravrtti.smrti_exploration_pool(sleeper((7, "none"), own=1))
+    assert "dart" not in pravrtti.smrti_exploration_pool(sleeper((7, "none")))      # the control of the move: the same copy, nothing moved
+    assert "dart" in pravrtti.smrti_exploration_pool(sleeper((7, "none"), moved=True))
 
 
 def test_a_round_is_those_within_reach_at_the_same_moment(
@@ -2519,7 +2609,7 @@ def test_a_round_is_those_within_reach_at_the_same_moment(
             return lambda *a, **k: None
 
     world.samskara().kala = _Kala()
-    monkeypatch.setattr(spanda, "_kala_gate", lambda world, pool: (pool, {}))
+    monkeypatch.setattr(spanda, "kala_gate", lambda world, pool: (pool, {}))
     client.post("/pulses", json={"action_text": "I walk over to her.", "entity_id": "player"})  # behind: alone, at once
     assert calls[-1]["actor"] == "player" and not calls[-1]["sangama"] and "wait_until" not in calls[-1]
     n = len(calls)
@@ -2568,7 +2658,7 @@ def test_guests_play_only_their_own_characters_in_the_guest_world(
     world = client.app.state.world
     reg = [type("W", (), {"name": "Stonemarch", "database_url": "g", "gods": (), "port": None, "description": None})(), type("W", (), {"name": "Ravenmoor", "database_url": "l", "gods": (), "port": None, "description": None})()]
     active = {"w": reg[0]}
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: active["w"])
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: active["w"])
     monkeypatch.setattr(adhisthana, "get_worlds_registry", lambda: reg)
     ed = {"Cf-Access-Authenticated-User-Email": "guest1@example.com", "Cf-Ray": "x"}
     marc = {"Cf-Access-Authenticated-User-Email": "owner@example.com", "Cf-Ray": "x"}
@@ -2615,7 +2705,7 @@ def test_retiring_cuts_the_tether_and_leaves_the_being_in_the_world(
     world.playable_entity_ids = ["player", "wren"]
     world.played_by = {"wren": "guest2@example.com"}
     world.autonomous, world.logged_off = {"wren"}, {"wren"}
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
     ed = {"Cf-Access-Authenticated-User-Email": "guest1@example.com", "Cf-Ray": "x"}
     mike = {"Cf-Access-Authenticated-User-Email": "guest2@example.com", "Cf-Ray": "x"}
     records, memories = len(world.records), len(world.recent_memories)
@@ -2625,7 +2715,7 @@ def test_retiring_cuts_the_tether_and_leaves_the_being_in_the_world(
     assert client.post("/players/wren/retire", json={"confirm": "Wren"}, headers=mike).status_code == 409
     world.rounds.clear()
     alerts: list[tuple] = []
-    monkeypatch.setattr(dvara, "_schedule_alert", lambda title, message, click=None: alerts.append((title, message)))
+    monkeypatch.setattr(dvara, "schedule_alert", lambda title, message, click=None: alerts.append((title, message)))
     assert client.post("/players/wren/retire", json={"confirm": " wren "}, headers=mike).status_code == 204
     assert world.playable_entity_ids == ["player"] and "wren" in world.canon.entities
     assert "wren" not in world.played_by | {p: 1 for p in world.autonomous | world.logged_off}
@@ -2633,7 +2723,7 @@ def test_retiring_cuts_the_tether_and_leaves_the_being_in_the_world(
     # a guest's retirement is held back (Marc, 2026-10-02): out of the world until a god reviews and releases it
     assert world.held_back == {"wren"} and "wren" in world.absent() and fake_store._held_back == ["wren"]
     assert alerts == [("guest2@example.com retired Wren on Stonemarch", "Wren is held back until you review it (GET /world/held).")]
-    assert "wren" not in pravrtti._smrti_exploration_pool(world)
+    assert "wren" not in pravrtti.smrti_exploration_pool(world)
     assert [h["entity_id"] for h in client.get("/world/held").json()] == ["wren"]
     assert client.get("/world/held", headers=mike).status_code == 403                  # a guest cannot review
     assert client.post("/world/held/wren/release").status_code == 204
@@ -2654,9 +2744,9 @@ def test_a_guest_coming_online_sends_one_alert(client: TestClient, monkeypatch: 
     owner, this machine, or a visitor Cloudflare did not name."""
     _seed_square_world(client)
     sent = []
-    monkeypatch.setattr(dvara, "_schedule_alert", lambda title, message, click=None: sent.append((title, click)))
+    monkeypatch.setattr(dvara, "schedule_alert", lambda title, message, click=None: sent.append((title, click)))
     monkeypatch.setattr(dvara, "_guest_seen", {})
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry",
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry",
                         lambda: type("W", (), {"name": "Stonemarch", "gods": (), "url": "https://stonemarch.example", "guests": True})())
     ed = {"Cf-Access-Authenticated-User-Email": "guest1@example.com", "Cf-Ray": "x"}
     client.get("/worlds", headers=ed)
@@ -2685,14 +2775,14 @@ def test_a_guest_who_joins_plays_the_character_they_made(
 ) -> None:
     _seed_square_world(client)
     world = client.app.state.world
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
-    monkeypatch.setattr(bija_routes, "_join_locations", lambda w: [type("L", (), {"location_id": "square"})()])
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: None)
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
+    monkeypatch.setattr(udbhava, "join_locations", lambda w: [type("L", (), {"location_id": "square"})()])
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: None)
 
     async def made(req, w, roles):
         return schemas.JoinResponse(player_entity_id="wren", narration="You arrive.", narrations={"wren": "You arrive."})
 
-    monkeypatch.setattr(bija_routes, "_v3_join", made)
+    monkeypatch.setattr(udbhava, "v3_join", made)
     r = client.post("/world/join", json={"self_description": "I am Wren.", "entry_location_id": "square"},
                     headers={"Cf-Access-Authenticated-User-Email": "guest2@example.com", "Cf-Ray": "x"})
     assert r.status_code == 200 and world.played_by == {"wren": "guest2@example.com"}
@@ -2706,7 +2796,7 @@ def test_every_newcomer_begins_as_the_world_says(client: TestClient, monkeypatch
     their description claims and whichever model narrates."""
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     client.post("/genesis", json={"self_description": "I am Wren.", "setting": "A mill on a river.", "breadth": "here"})
@@ -2869,8 +2959,8 @@ def test_a_second_genesis_while_one_is_seeding_is_refused(monkeypatch: pytest.Mo
         await asyncio.sleep(0.05)
         return schemas.GenesisResponse(player_entity_id="", narration="", narrations={})
 
-    monkeypatch.setattr(bija_routes, "_v3_genesis", seeding)
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: None)
+    monkeypatch.setattr(udbhava, "v3_genesis", seeding)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: None)
     req = schemas.GenesisRequest(self_description="A miller's daughter at the ford.")
 
     async def twice():
@@ -2943,12 +3033,12 @@ def test_a_world_behind_the_migration_head_is_backed_up_then_brought_to_head(mon
 
     monkeypatch.setattr(asyncpg, "connect", connect)
     monkeypatch.setattr(adhisthana, "backup_world", lambda entry, reason: done.append(("backup", entry.name, reason)) or "old.dump")
-    monkeypatch.setattr(adhisthana, "_migrate_database", lambda u: done.append(("migrate", u)))
-    asyncio.run(adhisthana._bring_to_head(url))
+    monkeypatch.setattr(adhisthana, "migrate_database", lambda u: done.append(("migrate", u)))
+    asyncio.run(adhisthana.bring_to_head(url))
     assert done == [("backup", "Old World", "pre-migrate"), ("migrate", url)]
     done.clear()
     at["rev"] = head
-    asyncio.run(adhisthana._bring_to_head(url))
+    asyncio.run(adhisthana.bring_to_head(url))
     assert done == []
 
 
@@ -2982,7 +3072,7 @@ def test_a_page_is_shown_only_what_happened_in_its_players_present(client: TestC
     world._samskara = None
     row = Memory("r1", "square", frozenset({"player", "other"}), "A cart rattled across the square.", "AMBIENT", 5, "square", 3, "pw", None,
                  None, 98, 100)
-    spanda._queue_witnessed(world, [row])
+    spanda.queue_witnessed(world, [row])
     assert [w["text"] for w in world.pending_witnessed.get("player", [])] == ["A cart rattled across the square."]
     assert not world.pending_witnessed.get("other")                                # its moment is in their past
 
@@ -3005,11 +3095,11 @@ def test_an_earth_in_a_world_that_keeps_no_age_takes_no_turn(fake_store) -> None
                              Memory("m2", "age", frozenset(), "A ferry crossing, late autumn.", "PRIMARY", 3, "nowhere", 0, "genesis", None)]
     for t in (32, 33, 34):
         canon.world_time = t
-        assert "age" not in pravrtti._smrti_exploration_pool(world)
+        assert "age" not in pravrtti.smrti_exploration_pool(world)
     world.bhuvana = "THE YEAR. 3018."                                            # keeping an age: it chronicles
     canon.world_time = 32
     world._samskara = None
-    assert pravrtti._smrti_exploration_pool(world) == ["age"]
+    assert pravrtti.smrti_exploration_pool(world) == ["age"]
 
 
 def test_a_world_given_its_age_gives_it_to_its_earth(client: TestClient, monkeypatch: pytest.MonkeyPatch, fake_store) -> None:
@@ -3019,7 +3109,7 @@ def test_a_world_given_its_age_gives_it_to_its_earth(client: TestClient, monkeyp
     world = _seed_square_world(client)
     world.canon.entities["earth"] = Entity("earth", ["the world at large"], 0, ITIHASA)
     world.recent_memories.append(Memory("e0", "earth", frozenset(), "A town and its square.", "PRIMARY", 3, "nowhere", 0, "genesis", None))
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: type("R", (), {"smrti_client": None})())
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: type("R", (), {"smrti_client": None})())
     monkeypatch.setattr("smritilila.smrti.bija.write_bhuvana", lambda *a, **k: "THE YEAR. 1880, spring. THE REGIONS. The San Pedro.")
     r = client.post("/world/bhuvana", json={"setting": "A silver town."})
     assert r.status_code == 200, r.text
@@ -3087,8 +3177,8 @@ def test_a_guest_does_not_make_a_world_invited_or_not(client: TestClient, monkey
     async def make_db(name):
         made.append(name)
         return "tide_hall", "postgresql+asyncpg://x/tide_hall"
-    monkeypatch.setattr(loka, "_make_world_database", make_db)
-    monkeypatch.setattr(loka, "_spawn_world_server", lambda entry: spawned.append((entry.name, entry.port)))
+    monkeypatch.setattr(adhisthana, "make_world_database", make_db)
+    monkeypatch.setattr(adhisthana, "spawn_world_server", lambda entry: spawned.append((entry.name, entry.port)))
     assert dvara.GUESTS_MAY_CREATE_WORLDS is False                                  # the default
     assert client.post("/worlds/create", json={"name": "Tide Hall"}, headers=STRANGER).status_code == 403    # uninvited
     add_invite("stranger@example.com")
@@ -3124,7 +3214,7 @@ def test_a_worlds_god_administers_it_and_nothing_else(client: TestClient, monkey
     _seed_square_world(client)
     fen, grey = [w for w in load_worlds_registry(cfg) if w.name == "Hollow Fen"][0], [w for w in load_worlds_registry(cfg) if w.name == "Stonemarch"][0]
     active = {"w": fen}
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: active["w"])
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: active["w"])
     assert client.get("/world/view", headers=AUTHOR).status_code == 200              # their world: theirs to shape
     assert client.get("/world", headers=AUTHOR).status_code == 200                   # though no guest world
     assert client.get("/world/view", headers=STRANGER).status_code == 403
@@ -3237,7 +3327,7 @@ def test_a_worlds_line_is_drawn_from_its_root_and_listed_with_it(client: TestCli
     world.recent_memories.append(first)
     world.name = "Stonemarch"
     fake = _DescribeClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: GenerativeRoles(smrti_client=fake))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: GenerativeRoles(smrti_client=fake))
     r = client.post("/world/describe")
     assert r.status_code == 200 and r.json()["description"] == fake.line
     assert "A ferry crossing on the river Vadhu" in fake.calls[0][1]                 # drawn from the earth's first memory
@@ -3255,7 +3345,7 @@ def test_a_line_that_fails_to_draw_keeps_the_one_it_had(client: TestClient, monk
     set_world_description("Stonemarch", "It is 576 in the Flanaess.", path=cfg)
     world = _seed_square_world(client)
     world.name, world.setting_description = "Stonemarch", "Millhaven, in summer."
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: GenerativeRoles(smrti_client=_DescribeClient("x" * 300)))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: GenerativeRoles(smrti_client=_DescribeClient("x" * 300)))
     assert client.post("/world/describe").status_code == 409
     assert next(w for w in load_worlds_registry(cfg) if w.name == "Stonemarch").description == "It is 576 in the Flanaess."
     assert client.post("/world/describe", headers=STRANGER).status_code == 403       # a world's gods draw it
@@ -3270,13 +3360,13 @@ def test_the_seed_is_sown_on_the_earth_at_birth_and_a_gods_edit_appends_to_it(
     from smritilila.smrti import prakriti
     roles = _fake_roles(_SpyNarrator())
     roles.smrti_client = _BijaClient()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: roles)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda t: None)})())
     client.post("/world/clear")
     assert client.post("/genesis", json={"self_description": "I am Wren, the miller's daughter.", "setting": "A mill on a river.",
                                          "breadth": "wide", "source": "the sagas"}).status_code == 200
     world = client.app.state.world
-    earth = adhisthana._earth(world.canon)
+    earth = adhisthana.earth_of(world.canon)
     assert earth is not None and prakriti.sown(world.records, earth)
     birth = (world.darsana, world.becomings, world.world_data)
     assert prakriti.reap(world.records, earth) == birth and birth[2]["source"] == "the sagas"
@@ -3307,7 +3397,7 @@ def test_a_pinned_server_shows_its_own_world_and_choosing_another_is_going_to_it
                 WorldRegistryEntry("Shaped", "postgresql+asyncpg://x/smritilila_shaped", gods=("author@example.com",))]
     monkeypatch.setattr(adhisthana, "get_worlds_registry", lambda: registry)
     monkeypatch.setenv("SMRITILILA_DEV_PORT", "8200")
-    monkeypatch.setattr(adhisthana, "_remember_active_world", lambda name: None)
+    monkeypatch.setattr(adhisthana, "remember_active_world", lambda name: None)
     adhisthana._recall_active_world()
     assert main.app.state.active_database_url == "postgresql+asyncpg://x/smritilila_fafo"
     r = client.post("/worlds/select", json={"name": "Stonemarch"})
@@ -3323,10 +3413,10 @@ def test_a_pinned_server_shows_its_own_world_and_choosing_another_is_going_to_it
     author = {"Cf-Access-Authenticated-User-Email": "author@example.com"}
     assert "Shaped" in [w["name"] for w in client.get("/worlds", headers=author).json()]
     crossing = registry[3]
-    assert dvara._open_to_guests(crossing, "guest.a@example.com") and not dvara._open_to_guests(crossing, "friend@example.com")
-    assert not dvara._open_to_guests(crossing, "") and not dvara._open_to_guests(crossing)
+    assert dvara.open_to_guests(crossing, "guest.a@example.com") and not dvara.open_to_guests(crossing, "friend@example.com")
+    assert not dvara.open_to_guests(crossing, "") and not dvara.open_to_guests(crossing)
     monkeypatch.setenv("SMRITILILA_DEV_PORT", "8299")  # a server no world holds: switched by its owner, as before
-    assert adhisthana._pinned_world() is None
+    assert adhisthana.pinned_world() is None
 
 
 def test_the_page_is_told_whether_it_serves_an_owner(client: TestClient, tmp_path, monkeypatch) -> None:
@@ -3367,7 +3457,7 @@ def test_every_online_player_is_listed_to_everyone_with_where_and_when(client: T
                               Memory("g-ghost", "ghost", frozenset(), "I stand in the town square.", "PRIMARY", 3, "square", 0, "genesis", None, began=100, ended=150)]
     for pid in ("player", "wren"):                      # online; the ghost is not (no presence has ever been seen)
         world.presence[pid], world.last_seen[pid] = "online", time.monotonic()
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
     mike = {"Cf-Access-Authenticated-User-Email": "guest2@example.com", "Cf-Ray": "x"}   # plays none of them
     ed = {"Cf-Access-Authenticated-User-Email": "guest1@example.com", "Cf-Ray": "x"}        # plays the ghost
     # a world with no clock says where, never when
@@ -3401,7 +3491,7 @@ def test_an_owner_may_ask_for_those_whose_page_is_closed_but_whose_time_is_still
     world.presence["wren"], world.last_seen["wren"] = "offline", time.monotonic()           # closed the tab a moment ago: offline, not logged off
     world.logged_off = {"ghost", "sleeper"}                                                 # by the button, or thirty minutes without acting
     world.waiting = {"waiter"}                                                              # offline and chose to wait: brought along, no bound
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: type("W", (), {"name": "Stonemarch", "gods": ()})())
     mike = {"Cf-Access-Authenticated-User-Email": "guest2@example.com", "Cf-Ray": "x"}
     assert [p["entity_id"] for p in client.get("/world/sync").json()] == ["player"]            # as ever: only who is online
     got = client.get("/world/sync?own=1").json()
@@ -3530,5 +3620,54 @@ def test_a_pinned_world_narrates_by_its_own_share(tmp_path, monkeypatch) -> None
     shares = {}
     for port in (8202, 8198, 8203):
         monkeypatch.setenv("SMRITILILA_DEV_PORT", str(port))
-        shares[port] = adhisthana._resolve_roles().smrti_client._share
+        shares[port] = adhisthana.resolve_roles().smrti_client._share
     assert shares == {8202: 0.0, 8198: 0.95, 8203: 0.95}  # a nonsense share is the server's own
+
+
+def test_a_telling_is_put_at_the_top_of_the_screen_and_held_there() -> None:
+    """Marc, 2026-11-22: "make sure the screen recenters so the narration starts at the top of the screen. Right now it's scrolled down". Every new line was
+    scrolled to the foot of the log, the telling included, and only the answer to the player's own action was taken back to its start, smoothly, from the foot:
+    a reflow meanwhile, or the act box taking focus (which scrolls it into view), left the page down. Now a telling is never taken to the foot, the screen is put
+    with its start at the top in one instant move and held there while the page settles until the reader takes over, a page too short to get there is given the
+    room it lacks, and focusing the box does not scroll. Structure only (no JS runtime is available to the suite); met in a browser at 593x477 against the
+    Crossing with every non-GET held back in the page: a 1,909 px telling, a 247 px one on a short page (86 px of room made), a telling with no turn around
+    it, a 250 px reflow above the held place (put back on the next frame, scroll anchoring off), a wheel releasing the hold, and a switch landing at the top."""
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "src" / "smritilila" / "web" / "index.html").read_text(encoding="utf-8").replace("\r\n", "\n")
+    # a narration entry is not scrolled to the foot: the return comes before the foot scroll, and the foot scroll is still there for every other line
+    fn = html[html.index("function appendPlayerEntry("):]
+    fn = fn[:fn.index("\n}\n")]
+    assert fn.index('if (cls === "you") { lastTelling = div; return; }') < fn.index("window.scrollTo(0, Math.max(0, foot - window.innerHeight))")
+    assert "releaseTopHold();" in fn                                                      # any other line is the player's own: the hold ends
+    # the answer is held at the top of the screen, instantly: not scrolled into view smoothly, from the foot
+    result = html[html.index("async function showResult("):]
+    result = result[:result.index("\n}\n")]
+    assert "holdAtTop(turn || lastTelling)" in result and "scrollIntoView" not in result
+    assert 'behavior: "smooth"' not in html                                               # nothing scrolls the page smoothly to the telling now
+    # the hold gives way to the reader, keeps the place when the page moves under it, and makes the room a short page lacks
+    for ev in ('"wheel"', '"touchstart"', '"keydown"', '"pointerdown"'):
+        assert ev in html[html.index("function releaseTopHold()"):html.index("function appendPlayerEntry(")]
+    assert "new ResizeObserver(" in html and "function placeAtTop(el)" in html and 'id = "scroll-room"' in html
+    # the player acting ends it, the box takes focus without scrolling, and a recap (opened or switched to) is the top of the page
+    start = html[html.index("function startTurn()"):]
+    assert "releaseTopHold();" in start[:start.index("\n}\n")] and "clearScrollRoom();" in start[:start.index("\n}\n")]
+    run = html[html.index("async function runAction("):]
+    assert "input.focus({ preventScroll: true })" in run[:run.index("\n}\n")]
+    recap = html[html.index("async function showRecap("):]
+    assert "window.scrollTo(0, 0);" in recap[:recap.index("\n}\n")]
+
+
+def test_the_act_form_does_not_ride_the_bottom_edge_of_a_phone_or_a_touch_screen() -> None:
+    """Marc, 2026-11-24: "the act button doesn't respond when the keyboard is still up". A phone's keyboard shrinks what is seen and not the page, so a form glued to
+    the page's bottom edge (`position: sticky; bottom: 20px`) lies under the keyboard and the browser's touch handling for it goes wrong. The rule that was meant
+    to prevent it, `#act-form { position: static; }` in the 720px block, came from the first commit and never took effect: the sticky rule is later and weighs the
+    same, so it won, and at 375px wide the form was sticky (measured in a browser at that width). Structure only: the static rule must come after the sticky one,
+    for a narrow window or a touch screen, and the dead copy before it is gone. Met at 375px (static, travelling with the page, Act the element a tap reaches)
+    and at 1000px with a mouse (still sticky); a real keyboard was not met."""
+    from pathlib import Path
+    html = (Path(__file__).resolve().parent.parent / "src" / "smritilila" / "web" / "index.html").read_text(encoding="utf-8").replace("\r\n", "\n")
+    sticky = "#act-form { display: flex; gap: 10px; position: sticky; bottom: 20px; }"
+    phone = "@media (max-width: 720px), (pointer: coarse) { #act-form { position: static; } }"
+    assert html.count(sticky) == 1 and html.count(phone) == 1
+    assert html.index(phone) > html.index(sticky)                                         # the later of two rules of one weight is the one that applies
+    assert "#player-column, #entity-column { width: 100%; }\n    #act-form { position: static; }" not in html   # the dead copy in the 720px block above the sticky rule is gone

@@ -73,7 +73,7 @@ def test_a_guest_is_refused_every_admin_route_and_nothing_changes(client, regist
 
 def test_the_endpoints_refuse_a_guest_on_their_own_even_if_the_gate_were_open(client, registry, monkeypatch):
     from smritilila import main
-    monkeypatch.setattr(main, "_OPEN_TO_ANY", {"/admin", "/admin/worlds", "/admin/worlds/Crossing/guests", "/me"})
+    monkeypatch.setattr(main, "OPEN_TO_ANY", {"/admin", "/admin/worlds", "/admin/worlds/Crossing/guests", "/me"})
     assert client.get("/admin/worlds", headers=GUEST).status_code == 403
     assert client.put("/admin/worlds/Crossing/guests", json={"mode": "all"}, headers=GUEST).status_code == 403
     assert client.get("/admin", headers=GUEST).status_code == 403

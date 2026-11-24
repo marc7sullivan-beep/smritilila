@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Sequence
 
 from smritilila.llm.client import Picture
-from smritilila.smrti.bija import _key
+from smritilila.smrti.bija import label_key
 
 MAX_MAP_PLACES = 400            # one map's seed: every name on a sheet, never a world's history
 READ_ATTEMPTS = 3               # a part that cannot be read after this many tries fails the whole read: a silent hole in "every name" is worse
@@ -297,7 +297,7 @@ def build_spec(areas: Sequence[dict], parts: dict[str, list[dict]], known: Seque
     used = set(taken_ids)
 
     def new_key(name: str) -> str:
-        k = _key(name)
+        k = label_key(name)
         while k in used:
             k += "_"
         used.add(k)

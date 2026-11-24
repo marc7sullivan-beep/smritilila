@@ -15,6 +15,7 @@ from smritilila import adhisthana
 from smritilila.adhisthana import WorldSession
 from smritilila.graph.entity import Entity
 from smritilila.llm.client import Picture
+from smritilila import paths
 from smritilila.routes import pratistha as pratistha_routes
 from smritilila.smrti import manacitra as M
 from smritilila.smrti.kala import ITIHASA
@@ -220,9 +221,9 @@ def test_a_map_is_proposed_and_proved_not_planted_and_only_a_file_in_the_worlds_
     world.recent_memories, world.records, world.name = list(mems), list(recs), "testworld"
     client.app.state.world = world
     reader = _Reader()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=reader))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=reader))
     monkeypatch.setattr(pratistha_routes, "PROPOSALS_DIR", tmp_path / "proposals")
-    monkeypatch.setattr(pratistha_routes, "MAPS_DIR", tmp_path / "maps")
+    monkeypatch.setattr(paths, "MAPS_DIR", tmp_path / "maps")
     (tmp_path / "maps" / "testworld").mkdir(parents=True)
     (tmp_path / "maps" / "testworld" / "sheet.png").write_bytes(_sheet().data)
     assert client.post("/world/manacitra", json={"image": "../sheet.png"}).status_code == 422                 # a name, never a path
@@ -246,13 +247,13 @@ def test_a_guest_cannot_start_a_map_reading_but_the_owner_and_the_worlds_god_can
     world.recent_memories, world.records, world.name = list(mems), list(recs), "testworld"
     client.app.state.world = world
     reader = _Reader()
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=reader))
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: adhisthana.GenerativeRoles(smrti_client=reader))
     monkeypatch.setattr(pratistha_routes, "PROPOSALS_DIR", tmp_path / "proposals")
-    monkeypatch.setattr(pratistha_routes, "MAPS_DIR", tmp_path / "maps")
+    monkeypatch.setattr(paths, "MAPS_DIR", tmp_path / "maps")
     (tmp_path / "maps" / "testworld").mkdir(parents=True)
     (tmp_path / "maps" / "testworld" / "sheet.png").write_bytes(_sheet().data)
     entry = type("W", (), {"name": "Stonemarch", "database_url": "g", "gods": ("god@example.com",), "port": None, "description": None})()
-    monkeypatch.setattr(adhisthana, "_active_world_registry_entry", lambda: entry)
+    monkeypatch.setattr(adhisthana, "active_world_registry_entry", lambda: entry)
     monkeypatch.setattr(adhisthana, "get_worlds_registry", lambda: [entry])
     guest = {"Cf-Access-Authenticated-User-Email": "friend@example.com", "Cf-Ray": "x"}
     god = {"Cf-Access-Authenticated-User-Email": "god@example.com", "Cf-Ray": "x"}

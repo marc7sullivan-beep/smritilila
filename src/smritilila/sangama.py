@@ -5,7 +5,7 @@ v5 §36). This module is the round's bookkeeping: which round a player is in (th
 a window joins to it, as one), who its members are (in the world, within reach, at the same moment), what each
 player's page is shown of it, when Go may close it, and how a declined jump ends it.
 
-The routes that act on a round, and the writing of it, stay with the pulse (routes/spanda.py): they run one. Moved out of main.py
+The routes that act on a round stay with the pulse's routes (routes/spanda.py), and the writing of it with the pulse (spanda.py): they run one. Moved out of main.py
 unchanged (2026-10-05, Marc: "let's go get that main.py in shape"); main re-exported every name until c3e89a4; it no longer does.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from smritilila.sakshi import log_event
-from smritilila.schemas import RoundMember, RoundOut, _labelled, _told_nothing
+from smritilila.schemas import RoundMember, RoundOut, labelled, told_nothing
 from smritilila.smrti.context import NOWHERE
 from smritilila.training_data import log_discarded
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from smritilila.adhisthana import WorldSession
 
 
-def _reach_key(k, scene: str | None, t: int) -> str | None:
+def reach_key(k, scene: str | None, t: int) -> str | None:
     """A round's key: the scene, with the scenes a boundary thing joins to it -- a door, a window, a gate
     (sandhi) -- as one. Marc, 2026-09-28: "Dunstan and I are still locked in rounds. Shouldn't we be going
     separately now?" -- keyed by the container directly above (v4.31), anyone anywhere in Millhaven (church,
@@ -41,12 +41,12 @@ def _reach_key(k, scene: str | None, t: int) -> str | None:
     return min(group)
 
 
-def _round_key(world: WorldSession, pid: str) -> str | None:
+def round_key(world: WorldSession, pid: str) -> str | None:
     """The round a player would act in: their scene's reach key."""
-    return _reach_key(world.kosha(), world.kosha().scene_of(pid, world.canon.world_time + 1), world.canon.world_time + 1)
+    return reach_key(world.kosha(), world.kosha().scene_of(pid, world.canon.world_time + 1), world.canon.world_time + 1)
 
 
-def _round_members(world: WorldSession, key: str | None, level_with: str | None = None) -> list[str]:
+def round_members(world: WorldSession, key: str | None, level_with: str | None = None) -> list[str]:
     """The players of a round: in the world, within reach of one another, and
     at the same moment (v5 §36 v4.31; Marc, 2026-09-28: "Within reach is exactly
     correct"). In the world is not logged off -- by the button, or thirty
@@ -62,31 +62,31 @@ def _round_members(world: WorldSession, key: str | None, level_with: str | None 
     kala = world.samskara().kala
     at = kala.now(level_with) if kala is not None and level_with else None
     return sorted(p for p in world.playable_entity_ids if p not in world.logged_off
-                  and _reach_key(k, k.scene_of(p, t), t) == key and (at is None or kala.now(p) == at))
+                  and reach_key(k, k.scene_of(p, t), t) == key and (at is None or kala.now(p) == at))
 
 
-def _decline_round(world: WorldSession, held: dict, by: str) -> None:
+def decline_round(world: WorldSession, held: dict, by: str) -> None:
     """A round's jump refused by one who acted in it: nothing is written, the
     round is over, and each of its other players is told who said no."""
     rnd = held["round"]
-    everyone = _round_acting(rnd, held["actor"])
+    everyone = round_acting(rnd, held["actor"])
     for p in everyone:
         world.held.pop(p, None)
     world.rounds.pop(rnd["scene"], None)
-    name = _labelled(world.canon, by)
+    name = labelled(world.canon, by)
     for p in everyone | set(rnd["others"]):
         if p != by:
-            world.round_told[p] = _told_nothing(round={"declined_by": name, "scene": rnd["scene"]})
+            world.round_told[p] = told_nothing(round={"declined_by": name, "scene": rnd["scene"]})
     log_discarded(pulse_id=held["pulse_id"], reason="declined", detail=held["kind"])
     log_event("smrti.declined", pulse_id=held["pulse_id"], entity_id=by, kind=held["kind"], round=sorted(everyone))
 
 
-def _round_held(world: WorldSession, scene: str) -> bool:
+def round_held(world: WorldSession, scene: str) -> bool:
     """A scene's round written and waiting on its players' yes (v5 §36)."""
     return any("round" in h and h["round"]["scene"] == scene for h in world.held.values())
 
 
-def _round_acting(rnd: dict, actor: str) -> set[str]:
+def round_acting(rnd: dict, actor: str) -> set[str]:
     """Everyone who acted in a round being written: its actor and the others who acted."""
     return {actor} | {p for p, a in rnd["others"].items() if a}
 
@@ -102,25 +102,25 @@ def confirm_of(held: dict) -> dict:
     return out
 
 
-def _round_state(world: WorldSession, scene: str | None, pid: str) -> RoundOut:
+def round_state_of(world: WorldSession, scene: str | None, pid: str) -> RoundOut:
     r = world.rounds.get(scene or "") or {"actions": {}}
-    members = sorted(set(_round_members(world, scene, pid)) | set(r["actions"]) | ({pid} if scene else set()))
+    members = sorted(set(round_members(world, scene, pid)) | set(r["actions"]) | ({pid} if scene else set()))
     held = world.held.get(pid)
     confirm = waiting = None
     if held is not None and "round" in held:
-        everyone = _round_acting(held["round"], held["actor"])
-        waiting = [_labelled(world.canon, p) for p in sorted(everyone - held["yes"])]
+        everyone = round_acting(held["round"], held["actor"])
+        waiting = [labelled(world.canon, p) for p in sorted(everyone - held["yes"])]
         if pid not in held["yes"]:
             confirm = confirm_of(held)
-    return RoundOut(scene=scene, members=[RoundMember(id=m, name=_labelled(world.canon, m), acted=m in r["actions"]) for m in members],
+    return RoundOut(scene=scene, members=[RoundMember(id=m, name=labelled(world.canon, m), acted=m in r["actions"]) for m in members],
                     open=bool(r["actions"]), acted=pid in r["actions"], running=bool(r.get("running")),
-                    confirm=confirm, waiting_on=waiting or [], go_in=_go_in(world, scene, members, r["actions"]))
+                    confirm=confirm, waiting_on=waiting or [], go_in=go_in(world, scene, members, r["actions"]))
 
 
 GO_QUIET = 20  # seconds (Marc, 2026-09-27): Go waits this long after the last keystroke of anyone in the round yet to act
 
 
-def _go_in(world: WorldSession, scene: str | None, members: Iterable[str], actions: dict) -> float:
+def go_in(world: WorldSession, scene: str | None, members: Iterable[str], actions: dict) -> float:
     """Seconds until Go may close the round: nobody yet to act has typed for
     GO_QUIET seconds -- at once, if none of them is typing."""
     last = max((world.typed.get(p, 0.0) for p in members if p not in actions), default=0.0)

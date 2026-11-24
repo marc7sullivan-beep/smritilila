@@ -71,6 +71,7 @@ RULES FOR WHAT YOU APPEND
 12. THE MACHINERY IS NEVER SPOKEN OF. Nothing you write -- the narration, a tuple, a suggestion -- ever speaks of the action, the input, the player, the page, a tick or a pulse.
 13. THE NARRATION is prose for a reader, 80 to 150 words: never an id, never a tuple, never any markup -- ids belong only in the structured fields. VOICE: in a player's turn, second person, present tense, addressed to the actor -- "You push through the doors; the noise hits you first." -- never the actor's name or "he/she" for the actor, never past tense, never first person. In a turn with no player -- someone acting on their own, a quiet scene -- close third, present tense. Tuples keep their own voice (rule 1).
    THE NARRATION KNOWS ONLY WHAT ITS READER KNOWS. In a player's turn it calls a person or a place by name only if the actor's own tuples carry that name, or they are told it this pulse; anyone else is described as the actor would see them ("the lean stranger at the hearth"), however plainly the memory names them. In a round, each player's narration keeps to what that player knows. The suggestions and the sara keep to it too.
+   EVERYONE PRESENT IS IN THE NARRATION. Each person in the scene at the end of the pulse -- anyone who could be seen or heard there, whether or not they do anything this pulse -- appears in the narration at least once: by name where the reader knows the name (the rule above), otherwise as the reader would see them ("the lean stranger at the hearth", "his big companion"). Several may share a phrase ("the three scholars at the window"); a clause is enough, and the narration stays 80 to 150 words. A player who is present is one of them (rule 10 still holds: present, never voiced). Things need no mention unless the telling uses them.
 14. SUGGESTIONS AND SARA.
    SUGGESTED NEXT ACTION: one sentence the actor's player might plausibly do next, grounded in this scene. It proposes an ACTION only -- what the actor might do -- and never a state of the world: never what is true, what remains, how many, or what something was ("go and ask her", never "tell her it is settled and only one remains").
    SUGGESTED NEXT ACTION FROM MEMORY: a second, different one sentence, grounded ONLY in the THREAD FROM MEMORY line below the action -- something the actor could set about from where they now stand concerning that person or place: seek them, send word, return, make good. The same rule: an action, never a claim. Never a rephrasing of the first, never about this scene. If the line says (none), a modest safe action instead.
@@ -171,7 +172,7 @@ CLOSES = ("the ticks (the number after the id in MEMORY) of THIS perceiver's own
           "so would 'I let the moon pass and never went', for a broken promise is as closed as a kept one. A BUCKET OF WATER: [90] 'I set "
           "the bucket under the pump and worked the handle' opens it; [91] 'it was half full' closes nothing; [92] 'the bucket was full "
           "and I carried it to the trough' closes [90]. A small matter closes as surely as a long one. Only memories listed under MEMORY "
-          "for this perceiver")
+          "for this perceiver may be named.")
 
 SCHEMA = {
     "type": "object",

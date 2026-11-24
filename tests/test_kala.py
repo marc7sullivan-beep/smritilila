@@ -13,7 +13,8 @@ from smritilila.memory.record import Record
 from smritilila.smrti.kala import Kala, changes_in, mirror, time_line
 from smritilila.smrti.kosha import Kosha
 from smritilila import adhisthana
-from smritilila.routes import spanda
+from smritilila import spanda
+from smritilila.routes import spanda as spanda_routes
 
 CLOCK = {"epoch": "1928-04-27T00:00", "start": 25 * 60}  # Saturday 28 April 1928, 1:00 am
 H = 60
@@ -341,6 +342,65 @@ def test_a_pulse_in_a_branch_lives_its_own_time_and_the_world_moves_by_the_rate(
     assert "THIS TURN COVERS THE NEXT 1 hour --" in seen[-1] and {m.ended for m in r.memories_written} == {ONE + 120}
 
 
+def test_a_moment_turn_is_asked_for_a_moment_and_stamped_with_the_span(monkeypatch) -> None:
+    """kshana (Marc, 2026-11-07): a world's turn given an action is asked for ONE MOMENT -- the player's time line, not the span's -- and still
+    stamped with the span the gate gave, whatever the Narrator said, so the clock lands where the span ends with no second call. Only the time
+    line changes: without kshana the same turn is told the span (as every world's turn was)."""
+    from smritilila.smrti.pulse import run_smrti_pulse
+    canon = Maya(world_time=6, entities={
+        "hollow": Entity("hollow", ["the fey hollow"], 0, "genesis"),
+        "yard": Entity("yard", ["the yard"], 0, "genesis", avarana="scene"),
+        "wen": Entity("wen", ["Wentworth"], 0, "genesis")})
+    mems = [Memory("m1", "wen", frozenset(), "I stood in the yard.", "PRIMARY", 4, "yard", 3, "p3", None)]
+    recs = [Record("r0", "kosha", "yard", "hollow", 0, "p0", None), Record("r1", "kosha", "wen", "yard", 0, "p0", None),
+            _span("wen", ONE, ONE, "yard", "yard", 3)]
+    seen = []
+
+    class C:
+        def complete_with_tool(self, system, user, **kw):
+            seen.append(user)
+            return {"narration": "Wentworth waits.", "elapsed_minutes": 5,
+                    "perceiver_tuples": [{"perceiver": "wen", "text": "I waited in the yard.", "salience": "ordinary"}],
+                    "scene_tuples": [{"scene": "yard", "text": "A man waited in the yard.", "present": ["wen"]}],
+                    "suggested_next_action": ""}
+    events = []
+    monkeypatch.setattr("smritilila.smrti.pulse.log_event", lambda name, **f: events.append((name, f)))
+    kw = dict(view={"world_data": {"clock": CLOCK}}, players=frozenset(), playable=frozenset(), records=recs)
+
+    def run(action, **more):
+        return run_smrti_pulse(canon, "wen", action, 6, "p6", mems, C(), None, **kw, **more)
+
+    def autonomous():
+        return [f["autonomous"] for name, f in events if name == "smrti.pulse"][-1]
+
+    # as it always was: no action, the span, told as the span and stamped with it
+    r = run(None, max_elapsed=120)
+    assert "THIS TURN COVERS THE NEXT 2 hours --" in seen[-1] and {m.ended for m in r.memories_written} == {ONE + 120}
+    # an action with the span: still told the span (kshana is what changes the line)
+    r = run("Check the gate.", max_elapsed=120)
+    span_user = seen[-1]
+    assert "THIS TURN COVERS THE NEXT 2 hours --" in span_user and "ACTION: Check the gate." in span_user
+    assert autonomous() is False                   # an action without kshana is not the world's own turn
+    # the moment: the player's time line, no span text -- and the stamp is the span's, not the Narrator's five minutes
+    r = run("Check the gate.", max_elapsed=120, kshana=True)
+    moment_user = seen[-1]
+    assert "THIS TURN COVERS" not in moment_user and "Give `elapsed_minutes`" in moment_user and "ACTION: Check the gate." in moment_user
+    assert {m.ended for m in r.memories_written} == {ONE + 120} and r.elapsed == 120 and r.pending is None
+    assert autonomous() is True                    # the world's own turn still, for every reader of the witness
+    # the line is the only thing that differs from the span's telling
+    drop = [l for l in span_user.split("\n") if l.startswith("THE TIME HERE")]
+    keep = [l for l in moment_user.split("\n") if l.startswith("THE TIME HERE")]
+    assert [l for l in span_user.split("\n") if l not in drop] == [l for l in moment_user.split("\n") if l not in keep]
+    # others have lived part of the span: an action's pulse is told again with it shown (mirror_rerun); a moment is held, as a world's turn is
+    monkeypatch.setattr("smritilila.smrti.pulse.mirror", lambda *a, **k: [(ONE + 10, "dan")])
+    n = len(seen)
+    run("Check the gate.", max_elapsed=120)
+    assert len(seen) - n == 2
+    n = len(seen)
+    run("Check the gate.", max_elapsed=120, kshana=True)
+    assert len(seen) - n == 1
+
+
 def _gate_world():
     import time as _time
     from smritilila import main
@@ -402,12 +462,12 @@ def test_the_worlds_turns_follow_the_players_and_never_narrate_over_what_was_liv
     begins the hour before its reference, not at 1:00. The oldest wake first."""
     main, world = _hall_world()
     three, seven = ONE + 2 * H, ONE + 6 * H
-    assert pravrtti._kala_gate(world, ["groom", "barman", "stable"]) == (
+    assert pravrtti.kala_gate(world, ["groom", "barman", "stable"]) == (
         ["barman", "groom"], {"groom": (three, 4 * H), "barman": (three, 4 * H), "stable": (seven, H)})
-    assert pravrtti._kala_gate(world, ["stable"]) == (["stable"], {"stable": (seven, H)})
+    assert pravrtti.kala_gate(world, ["stable"]) == (["stable"], {"stable": (seven, H)})
     # a world without a clock: the pool as it was
     world.world_data = {}
-    assert pravrtti._kala_gate(world, ["groom"]) == (["groom"], {})
+    assert pravrtti.kala_gate(world, ["groom"]) == (["groom"], {})
 
 
 def test_a_drawn_turn_keeps_its_cap_when_another_pulse_gates_before_it_starts(monkeypatch) -> None:
@@ -429,15 +489,15 @@ def test_a_drawn_turn_keeps_its_cap_when_another_pulse_gates_before_it_starts(mo
 
     monkeypatch.setattr(spanda, "run_smrti_pulse", run)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: type("E", (), {"embed": staticmethod(lambda text: None)})())
-    monkeypatch.setattr(spanda, "_smrti_exploration_pool", lambda w: ["groom"])
-    for hold in ("_fold_absorbed", "_hold_for_away", "_hold_for_rounds"):
+    monkeypatch.setattr(spanda, "smrti_exploration_pool", lambda w: ["groom"])
+    for hold in ("fold_absorbed", "hold_for_away", "hold_for_rounds"):
         monkeypatch.setattr(spanda, hold, lambda w, pool: pool)
     roles = type("R", (), {"smrti_client": None})()
     tasks = BackgroundTasks()
     result = SmrtiPulseResult(narration="You wait.", memories_written=[], new_entities=[], suggested_next_action="",
                               context_tuples=0, bound_ids=[])
     spanda._after_smrti_commit(world, roles, tasks, result, "wen", "p9", 0.0)
-    pravrtti._kala_gate(world, ["stable"])  # another player's pulse commits before the groom's scene is free
+    pravrtti.kala_gate(world, ["stable"])  # another player's pulse commits before the groom's scene is free
     asyncio.run(tasks())
     assert seen == {"groom": (ONE + 2 * H, 4 * H)}  # begins when Danforth is gone, ends before Wentworth comes
 
@@ -465,9 +525,9 @@ def test_a_world_turn_stops_at_an_offline_players_present_unless_the_world_may_a
     world.recent_memories = [_m(1, "aunt", "parlour", 1, ONE - 10, ONE), _m(2, "mara", "parlour", 2, ONE - 10, ONE),
                              _m(3, "wen", "study", 3, ONE, ONE + 2 * H)]
     world.last_seen["wen"] = _time.monotonic()  # Wentworth online, in the study, later; Mara offline in the parlour
-    assert pravrtti._kala_gate(world, ["aunt"])[0] == []              # the parlour waits at Mara's present
+    assert pravrtti.kala_gate(world, ["aunt"])[0] == []              # the parlour waits at Mara's present
     world.autonomous.add("mara")                                  # she lets the world act for her while away: carried
-    assert pravrtti._kala_gate(world, ["aunt"])[0] == ["aunt"]
+    assert pravrtti.kala_gate(world, ["aunt"])[0] == ["aunt"]
 
 
 def _held_bot_world():
@@ -497,13 +557,13 @@ def test_a_waiting_player_present_only_by_the_beat_does_not_hold_the_worlds_pres
     from smritilila.adhisthana import PLAYER_IDLE_SECONDS
     world = _held_bot_world()
     assert world.online("bot") and world.acting("wen") and not world.acting("bot")
-    assert pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]          # the present is Wentworth's, the orc is behind it
+    assert pravrtti.kala_gate(world, ["orc"])[0] == ["orc"]          # the present is Wentworth's, the orc is behind it
     world.last_acted["bot"] = _time.monotonic()                      # the bot acts: its clock is a present like any other
-    assert world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == []
+    assert world.acting("bot") and pravrtti.kala_gate(world, ["orc"])[0] == []
     world.last_acted["bot"] = _time.monotonic() - PLAYER_IDLE_SECONDS - 1   # it acted, long ago: a beat since
-    assert not world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]
+    assert not world.acting("bot") and pravrtti.kala_gate(world, ["orc"])[0] == ["orc"]
     world.waiting.discard("bot")                                     # not waiting: online is online, acted or not
-    assert world.acting("bot") and pravrtti._kala_gate(world, ["orc"])[0] == []
+    assert world.acting("bot") and pravrtti.kala_gate(world, ["orc"])[0] == []
 
 
 def test_the_world_still_waits_on_a_beat_when_no_one_is_acting() -> None:
@@ -518,9 +578,9 @@ def test_the_world_still_waits_on_a_beat_when_no_one_is_acting() -> None:
     world.recent_memories.append(_m(4, "old", "attic", 4, ONE - 20, ONE))       # Oldric, offline, at ONE (the world's first minute)
     del world.last_seen["wen"]                                       # Wentworth's page is closed: only the bot's beat is left
     assert not world.acting("bot") and world.online("bot")
-    assert pravrtti._kala_gate(world, ["orc"])[0] == ["orc"]         # the earliest of the online is the bot's ONE+H: the orc is behind it
+    assert pravrtti.kala_gate(world, ["orc"])[0] == ["orc"]         # the earliest of the online is the bot's ONE+H: the orc is behind it
     del world.last_seen["bot"]
-    assert pravrtti._kala_gate(world, ["orc"])[0] == []              # nobody online: the earliest of all, Oldric's ONE: the orc is past it
+    assert pravrtti.kala_gate(world, ["orc"])[0] == []              # nobody online: the earliest of all, Oldric's ONE: the orc is past it
 
 
 def _far_world(age_ahead: int):
@@ -555,12 +615,12 @@ def test_an_age_the_gate_would_hold_does_not_take_the_far_tick_from_the_far_worl
     from smritilila.smrti.kala import AGE_LEAD
     world = _far_world(AGE_LEAD + H)
     assert pravrtti._age_held(world) is True
-    pool = pravrtti._smrti_exploration_pool(world)
+    pool = pravrtti.smrti_exploration_pool(world)
     assert pool != ["age"] and "monk" in pool                          # the far being has its tick
-    drawn, turns = pravrtti._kala_gate(world, pool)
+    drawn, turns = pravrtti.kala_gate(world, pool)
     assert "monk" in drawn and "monk" in turns and "age" not in drawn   # the gate lets it run (the far scenes are asked too, as ever); the held age waits, as before
     world.canon.world_time = 82                                          # not a far tick: far beings wait for theirs, held age or none
-    assert "monk" not in pravrtti._smrti_exploration_pool(world)
+    assert "monk" not in pravrtti.smrti_exploration_pool(world)
 
 
 def test_an_age_the_gate_would_let_run_still_takes_the_far_tick_first() -> None:
@@ -568,8 +628,8 @@ def test_an_age_the_gate_would_let_run_still_takes_the_far_tick_first() -> None:
     from smritilila.smrti.kala import AGE_LEAD
     world = _far_world(AGE_LEAD - H)
     assert pravrtti._age_held(world) is False
-    assert pravrtti._smrti_exploration_pool(world) == ["age"]
-    assert pravrtti._kala_gate(world, ["age"])[0] == ["age"]
+    assert pravrtti.smrti_exploration_pool(world) == ["age"]
+    assert pravrtti.kala_gate(world, ["age"])[0] == ["age"]
     world.world_data = {}                                                # a world keeping no clock has nothing to hold: the age is never held
     assert pravrtti._age_held(world) is False
 
@@ -601,9 +661,9 @@ def test_an_engaged_scene_the_gate_holds_gives_the_draw_to_the_rest_of_the_world
     scene's only candidate (his companion) stood at the player's present, the gate held him (smrti.world_waits), and nobody else was asked.
     The engaged scene's draw that leaves nobody is an off-beat: the rest of the world is drawn, the player's scene left out."""
     world = _engaged_far_world(guard_held=True)
-    assert pravrtti._smrti_exploration_pool(world) == ["guard"]                       # the engaged scene has the draw, alone
-    assert pravrtti._kala_gate(world, ["guard"]) == ([], {})                          # and the gate holds him: before, nobody was drawn
-    rest = pravrtti._smrti_exploration_pool(world, redraw=True)
+    assert pravrtti.smrti_exploration_pool(world) == ["guard"]                       # the engaged scene has the draw, alone
+    assert pravrtti.kala_gate(world, ["guard"]) == ([], {})                          # and the gate holds him: before, nobody was drawn
+    rest = pravrtti.smrti_exploration_pool(world, redraw=True)
     assert "monk" in rest and "guard" not in rest and "porter" not in rest            # the off-beat's pool: the world, the player's scene left out
     drawn, turns = spanda._draw(world)
     assert "monk" in drawn and "monk" in turns                                        # the far being has the far tick
@@ -622,7 +682,7 @@ def test_an_engaged_scene_that_draws_someone_is_not_drawn_past() -> None:
 
 def test_a_redraw_without_an_engaged_scene_changes_nothing() -> None:
     world = _far_world(0)
-    assert pravrtti._smrti_exploration_pool(world, redraw=True) == pravrtti._smrti_exploration_pool(world)
+    assert pravrtti.smrti_exploration_pool(world, redraw=True) == pravrtti.smrti_exploration_pool(world)
 
 
 def test_a_redrawn_draw_is_witnessed(monkeypatch) -> None:
@@ -653,8 +713,8 @@ def test_a_rounds_key_is_the_scene_and_what_a_boundary_joins_to_it() -> None:
             "door": Entity("door", ["the hall door"], 0, "genesis", kosha="courtyard"),
             "heath": Entity("heath", ["the heath"], 0, "genesis", avarana="scene")}
     k = Kosha(Maya(world_time=3, entities=ents), [], [Record("s1", "sandhi", "door", "hall", 1, "p1", "open")])
-    from smritilila.sangama import _reach_key  # moved from main (2026-10-05)
-    key = lambda s: _reach_key(k, s, 4)  # noqa: E731
+    from smritilila.sangama import reach_key  # moved from main (2026-10-05)
+    key = lambda s: reach_key(k, s, 4)  # noqa: E731
     assert key("courtyard") == key("hall") and key("causeway") == "causeway" and key("causeway") != key("courtyard")
     assert key("heath") == "heath" and key(None) is None
 
@@ -663,7 +723,7 @@ def test_a_declined_jump_writes_nothing(monkeypatch) -> None:
     from fastapi.testclient import TestClient
     main, world = _gate_world()
     tags = []
-    monkeypatch.setattr(spanda, "log_discarded", lambda **kw: tags.append(kw))
+    monkeypatch.setattr(spanda_routes, "log_discarded", lambda **kw: tags.append(kw))  # a "no" is the route's own
     client = TestClient(main.app)
     client.app.state.world = world
     monkeypatch.setattr(adhisthana, "get_world", lambda: _async(world))
@@ -1067,7 +1127,10 @@ def _teo_says_yes(monkeypatch, world, roll="real"):
     async def turn(*a, **k):
         turns.append((a, k))
 
-    async def commit(world_, working, result_, actor, pid):
+    roles_ = object()  # what the server resolves: the commit must be handed it, for the births of whoever the telling gives a first tuple (2026-11-08)
+
+    async def commit(world_, working, result_, actor, pid, **kw):  # `roles` and a round's scene ride along
+        assert kw.get("roles") is roles_
         commits.append((working.world_time, [m.world_time for m in result_.memories_written]))
 
     async def rerun(req, world_, actor, roles, bt, start, confirmed=False, wait_until=None, window=None, setting=None, interrupt=None):
@@ -1081,13 +1144,13 @@ def _teo_says_yes(monkeypatch, world, roll="real"):
         monkeypatch.setattr(spanda, "_interruption", die)
     monkeypatch.setattr(spanda, "_run_smrti_activation_in_background", turn)
     monkeypatch.setattr(spanda, "_commit_smrti_result", commit)
-    monkeypatch.setattr(spanda, "_submit_smrti_pulse", rerun)
+    monkeypatch.setattr(spanda, "submit_smrti_pulse", rerun)
     monkeypatch.setattr(spanda, "_after_smrti_commit", lambda *a, **k: schemas.PulseResponse(
         narrations={}, promoted_entity_ids=[], suggested_next_action="", suggested_next_action_from_memory=""))
-    monkeypatch.setattr(adhisthana, "_resolve_roles", lambda: None)
+    monkeypatch.setattr(adhisthana, "resolve_roles", lambda: roles_)
     monkeypatch.setattr(adhisthana, "get_world", lambda: _async(world))
     monkeypatch.setattr(spanda, "log_discarded", lambda **k: None)
-    asyncio.run(spanda.confirm_pulse(schemas.ConfirmRequest(entity_id="teo", proceed=True), BackgroundTasks()))
+    asyncio.run(spanda_routes.confirm_pulse(schemas.ConfirmRequest(entity_id="teo", proceed=True), BackgroundTasks()))
     return turns, commits, reruns, rolls
 
 
@@ -1479,9 +1542,9 @@ def test_a_pulse_is_as_long_as_the_narrator_says_and_a_jump_of_days_is_worded_in
     """v5.31 (Marc, 2026-10-11): the cap of a day is gone; 3% of the Narrator's declared durations were a day or more (Filonius's 'two cold days' was written as 1440)."""
     from smritilila.smrti import kala as K
     from smritilila.smrti.pulse import _duration
-    assert K._minutes(2880) == 2880 and K._minutes(131_400) == 131_400                      # days, a season: as declared
-    assert K._minutes(-5) == 0 and K._minutes("x") == 1 and K._minutes(None) == 1            # a negative, a word or nothing: as before
-    assert K._minutes(1e30) == K.MAX_ELAPSED and K.MAX_ELAPSED > 100 * 525_600              # only the integer the column holds bounds it, far past a century
+    assert K.minutes(2880) == 2880 and K.minutes(131_400) == 131_400                      # days, a season: as declared
+    assert K.minutes(-5) == 0 and K.minutes("x") == 1 and K.minutes(None) == 1            # a negative, a word or nothing: as before
+    assert K.minutes(1e30) == K.MAX_ELAPSED and K.MAX_ELAPSED > 100 * 525_600              # only the integer the column holds bounds it, far past a century
     assert K.lived_span(10_080, 2.0) == 5_040 and K.lived_span(10_080, 1.0) == 10_080        # a week at half pace, no day cap on either branch
     assert _duration(45) == "45 min" and _duration(85) == "1 h 25 min" and _duration(7 * 60) == "7 h"   # a day's wording is unchanged below a day
     assert _duration(1440) == "1 day" and _duration(2880 + 180) == "2 days, 3 hours"

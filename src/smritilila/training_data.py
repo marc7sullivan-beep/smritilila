@@ -28,7 +28,7 @@ out).
 A call that errors, or comes back empty, is not logged -- but an example
 is written the moment a completion arrives, before anything has parsed or
 accepted it. So a completion that fails to parse (llm/client.py's
-_complete_json) is already in the log when the rotation retries it
+complete_json) is already in the log when the rotation retries it
 through the other client, and so is an answer a pulse later throws away
 (log_discarded tags that one): not every line is one to imitate. A
 logging failure must never affect the call it's instrumenting, same D5

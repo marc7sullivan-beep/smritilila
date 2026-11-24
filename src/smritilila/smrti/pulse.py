@@ -44,7 +44,7 @@ from smritilila.smrti.narrator import (
 from smritilila.sakshi import log_event
 from smritilila.training_data import log_discarded
 from smritilila.smrti.kala import (Kala, age_line, age_minutes, apart, changes_in, chronicle_ids, interruption_line, lived_line, lived_span, mirror, near_line, near_lived,
-                              presents_line, setting_line, time_line, window_line, world_span, _minutes)
+                              presents_line, setting_line, time_line, window_line, world_span, minutes)
 from smritilila.smrti.prakriti import DARSANA
 from smritilila.text import runs, sentences, shared_run, units, weight
 from smritilila.text import slug as _slug
@@ -450,7 +450,7 @@ def anusmrti(samskara, canon: Maya, actor_id: str, now: int, embed: Callable[[st
     if not log.stream(actor_id, before=now):
         return []
     world_data = (view or {}).get("world_data") or {}
-    ctx = _context_for(canon, log, actor_id, None, now, embed, keep=frozenset(players),
+    ctx = context_for(canon, log, actor_id, None, now, embed, keep=frozenset(players),
                        pacing=world_data.get("pacing"), sandhi=bool(world_data.get("sandhi")) or SANDHI_ALL)
     return [(t, ctx.sources.get((t.perceiver, t.seq), "")) for t in ctx.tuples if t.perceiver == actor_id]
 
@@ -467,7 +467,7 @@ def context_sections(ctx: Context) -> dict[str, dict[str, int]]:
     return out
 
 
-def _context_for(
+def context_for(
     canon: Maya, log: Smrti, actor_id: str, action_text: str | None, world_time: int,
     embed: Callable[[str], list[float]] | None, keep: frozenset[str] = frozenset(),
     pacing: dict | None = None, sandhi: bool = False,
@@ -1746,6 +1746,7 @@ def run_smrti_pulse(
     name_taken: dict[str, tuple[str, str]] | None = None,
     mention_named: dict[str, tuple[str, str]] | None = None,
     max_elapsed: int | None = None,
+    kshana: bool = False,
     confirmed: bool = False,
     wait_until: int | None = None,
     lived: list[tuple[int, str]] | None = None,
@@ -1796,6 +1797,13 @@ def run_smrti_pulse(
     a long jump; wait_until -- the player agreed to wait for a locked scene
     to open; lived -- the mirror's second pass, the span others have
     already lived where this pulse went.
+    kshana (क्षण, the moment; Marc, 2026-11-07): a world's turn taken as ONE MOMENT. The Narrator is asked for a moment, as for a player
+    ("Give `elapsed_minutes`: ..."), not for the span; and the pulse is stamped with the span the gate gave (max_elapsed) whatever it said
+    (as a world's turn always was), so the actor's clock lands where the span ends with no second call: only a moment's call changes the
+    world, the time after it passes unlived. Meant for a turn given an action (action_text) -- the one in hand -- for it is the action,
+    stated and aimed, that has the Narrator declare what is new; a span asked for in one answer is told as a summary and declares nothing
+    (replayed 2026-11-07, Stonemarch's priests and their bugbears: the span line with the action 1 of 8, the moment with a generic action
+    0 of 8, both 8 of 8 -- and a carried suggestion as the action at a moment 6 of 9 where it names them).
     sangama: saṅgama (Marc, 2026-09-27) -- the other players of a round in the
     actor's scene, {player: their action, or "" for one who did not act}.
     One narration tells the round; each of them is told it too
@@ -1812,7 +1820,7 @@ def run_smrti_pulse(
     -- {holder: (its name, the places it lists, the new places the first telling
     put directly in it)}: told the holder is full, to make one new place for the
     group inside it (holders_full).
-    interrupt: (minute, scene) -- a long jump the player agreed to that the die interrupted (routes/spanda.py `_interruption`, v5 §22: one
+    interrupt: (minute, scene) -- a long jump the player agreed to that the die interrupted (spanda.py `_interruption`, v5 §22: one
     roll, its chance rising with the jump's length): the action is lived up to that minute and the Narrator says what breaks in."""
     call = dict(locals())  # the call itself, for a second narration (_again): every argument, never a copied list of them
     sangama = dict(sangama or {})
@@ -1853,7 +1861,7 @@ def run_smrti_pulse(
         if as_origin and pull:
             action += ("\nTHE AGE'S PULL -- what is coming in the wide world, NOT YET HAPPENED here: it may colour rumour, worry and "
                        f"the talk of travellers, and draw threads toward this place; never tell any of it as having happened: {pull}")
-        ctx = _context_for(canon, log, actor_id, action_text, world_time, embed,
+        ctx = context_for(canon, log, actor_id, action_text, world_time, embed,
                            keep=frozenset(players or ()) | frozenset(playable or ()),
                            pacing=(view.get("world_data") or {}).get("pacing"), sandhi=sandhi)
         if sangama:
@@ -1861,7 +1869,7 @@ def run_smrti_pulse(
             have = {(t.perceiver, t.seq) for t in ctx.tuples}
             for pid in sangama:
                 try:
-                    theirs = _context_for(canon, log, pid, sangama[pid] or None, world_time, embed,
+                    theirs = context_for(canon, log, pid, sangama[pid] or None, world_time, embed,
                                           keep=frozenset(players or ()) | frozenset(playable or ()),
                                           pacing=(view.get("world_data") or {}).get("pacing"), sandhi=sandhi)
                 except ValueError:
@@ -1905,7 +1913,7 @@ def run_smrti_pulse(
                       or ctx.sources.get((t.perceiver, t.seq)) in ("last", "in_transit")]
         if ctx.place:
             ctx.present = {x for x in ctx.present if kala.present_at(x, ctx.place, time_now)}
-        kala_lines.append(time_line(kala, time_now, own if own is not None else time_now, max_elapsed, rate))
+        kala_lines.append(time_line(kala, time_now, own if own is not None else time_now, None if kshana else max_elapsed, rate))
         # a closed scene is NOT shown: told, the Narrator turns the lock into a fact of the world (a
         # building "locked fast until morning", with a player inside -- live, 2026-09-24). The pulse
         # goes where the action goes, and a closed destination asks its player after (below).
@@ -1915,7 +1923,7 @@ def run_smrti_pulse(
             kala_lines.append(interruption_line(kala, interrupt[0], interrupt[1], interrupt[0] - time_now))
         if setting:  # v4.32: the window's quiet turns -- the same hours around the actor, the same sky
             kala_lines.append(setting_line([(log.kosha.label(s), text) for s, text in setting]))
-        kala_lines += shown or []  # routes/spanda.py's: a window turn is shown the player's own time in it
+        kala_lines += shown or []  # spanda.py's: a window turn is shown the player's own time in it
     # janaśruti (v4.62): what has reached this scene by now as talk -- heavy moments elsewhere, on the world's clock
     if ctx.place and not as_chronicle:
         from smritilila.smrti.janasruti import heard, talk_line
@@ -2096,7 +2104,7 @@ def run_smrti_pulse(
                if not as_origin and as_chronicle is None else None)
     if fortune:
         view_text = "\n".join([view_text, daiva_line(fortune)] if view_text else [daiva_line(fortune)])
-        log_event("smrti.daiva", pulse_id=pulse_id, actor=actor_id, word=fortune, autonomous=action_text is None,
+        log_event("smrti.daiva", pulse_id=pulse_id, actor=actor_id, word=fortune, autonomous=action_text is None or kshana,
                   model=narrator_model)
     moment: list[tuple[str, str | None, str | None]] = []
     if sangama:
@@ -2205,7 +2213,7 @@ def run_smrti_pulse(
         dest = pl.scene_after(b, actor_id)
         dest = None if dest in (None, NOWHERE) else dest
         # v5 §19: the Narrator gives the time LIVED here, as long as it says (v5.31); the world moves as far as the rate says
-        lived = _minutes(out.raw.get("elapsed_minutes"))
+        lived = minutes(out.raw.get("elapsed_minutes"))
         elapsed = world_span(lived, rate)
         if max_elapsed is not None:
             # a world's turn covers the span it was given (kala.time_line), whatever it said -- as lived here
@@ -2391,7 +2399,7 @@ def run_smrti_pulse(
         span_lived = mirror(kala, scenes_, time_now, end, actor_id, here_now,
                             out_of_reach=frozenset(ahead) | frozenset(presents) | frozenset(players),
                             holders=lambda who: log.kosha.above(who, world_time + 1))
-        if span_lived and pending is None and not second_pass and action_text is not None:
+        if span_lived and pending is None and not second_pass and action_text is not None and not kshana:  # a moment's turn is held, as a world's turn is
             return _again("mirror_rerun", "passed through a span others had lived",
                           {"lived": [(m, who) for m, who in span_lived]}, lived=span_lived)
         # a long jump: the player's consent first
@@ -2465,7 +2473,7 @@ def run_smrti_pulse(
         if m.tier == "PRIMARY":
             uses[m.use or "none"] = uses.get(m.use or "none", 0) + 1
     log_event(
-        "smrti.pulse", pulse_id=pulse_id, world_time=world_time, actor=actor_id, autonomous=action_text is None, origin=as_origin,
+        "smrti.pulse", pulse_id=pulse_id, world_time=world_time, actor=actor_id, autonomous=action_text is None or kshana, origin=as_origin,
         tuples=len(ctx.tuples), place=ctx.place, scene_after=None if actor_at == NOWHERE else actor_at, written=len(written),
         records=len(records_written), moves=sum(1 for r in pl.records if r.kind == "kosha"), new=[e.labels[0] for e in b.new_entities],
         guarded={h: i for h, i in b.resolved.items() if i not in b.minted}, dropped=b.dropped, uses=uses,
@@ -2478,7 +2486,7 @@ def run_smrti_pulse(
     log_event(
         "smrti.energy", pulse_id=pulse_id, world_time=world_time, actor=actor_id,
         # what brought the present in
-        player_action=action_text is not None and actor_id in playable, autonomous=action_text is None,
+        player_action=action_text is not None and actor_id in playable, autonomous=action_text is None or kshana,
         arrival=as_origin, chronicle=as_chronicle is not None, news=bool(news), pull=bool(pull), elapsed=elapsed,
         # where the pulse stood relative to the players
         steps_to_player=steps, nearest_player=nearest, ticks_since_player=ticks_since_player(log, ctx.place, world_time, in_world),

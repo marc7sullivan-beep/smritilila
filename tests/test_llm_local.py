@@ -155,13 +155,13 @@ def test_the_environment_names_the_local_model_or_none(monkeypatch, clean_env, s
 def test_a_machine_with_only_a_local_model_narrates_with_it_alone(monkeypatch, clean_env, server):
     monkeypatch.setenv("SMRITILILA_LOCAL_BASE_URL", server.url)
     monkeypatch.setenv("SMRITILILA_LOCAL_MODEL", "m")
-    c = adhisthana._resolve_roles().smrti_client
+    c = adhisthana.resolve_roles().smrti_client
     assert isinstance(c, JsonShapedClient) and not isinstance(c, RotatingClient)
 
 
 def test_with_nothing_configured_the_error_says_what_to_set(clean_env):
     with pytest.raises(HTTPException) as e:
-        adhisthana._resolve_roles()
+        adhisthana.resolve_roles()
     assert e.value.status_code == 503 and "SMRITILILA_LOCAL_BASE_URL" in e.value.detail and "SMRITILILA_LOCAL_MODEL" in e.value.detail
 
 
@@ -170,7 +170,7 @@ def test_the_one_off_judgements_and_the_builder_use_the_local_model_when_it_is_a
     monkeypatch.setenv("SMRITILILA_LOCAL_MODEL", "m")
     assert best_available_client().model == "m"
     from smritilila.routes import sthapati
-    assert sthapati._builder_client().model == "m"
+    assert sthapati.builder_client().model == "m"
 
 
 def test_the_llm_call_is_recorded_with_the_local_backend_and_its_tokens(monkeypatch, server):

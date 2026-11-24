@@ -35,7 +35,7 @@ def client():
 @pytest.fixture()
 def builder(monkeypatch):
     b = _Builder()
-    monkeypatch.setattr(sthapati, "_builder_client", lambda: b)
+    monkeypatch.setattr(sthapati, "builder_client", lambda: b)
     return b
 
 
@@ -130,10 +130,10 @@ def test_a_guest_does_not_use_the_builder_and_the_model_is_never_called(client, 
 
 def test_the_endpoint_refuses_a_guest_on_its_own_even_if_the_gate_were_open(client, builder, monkeypatch):
     from smritilila import dvara, main
-    monkeypatch.setattr(dvara, "_OWNER_ONLY", set())
-    monkeypatch.setattr(main, "_OWNER_ONLY", set())
-    monkeypatch.setattr(main, "_OWNER_ONLY_PREFIX", ())
-    monkeypatch.setattr(main, "_OPEN_TO_ANY", {"/builder/turn", "/builder/preview", "/builder/build", "/builder/build/x", "/me"})   # a gate that lets it through
+    monkeypatch.setattr(dvara, "OWNER_ONLY", set())
+    monkeypatch.setattr(main, "OWNER_ONLY", set())
+    monkeypatch.setattr(main, "OWNER_ONLY_PREFIX", ())
+    monkeypatch.setattr(main, "OPEN_TO_ANY", {"/builder/turn", "/builder/preview", "/builder/build", "/builder/build/x", "/me"})   # a gate that lets it through
     r = client.post("/builder/turn", json={"messages": msgs(("user", "hi")), "draft": {}}, headers=GUEST)
     assert r.status_code == 403 and "builds worlds" in r.text and builder.calls == []
     r = client.post("/builder/build", json={"name": "Tide Hall", "draft": FULL}, headers=GUEST)
@@ -189,7 +189,6 @@ def test_the_page_has_the_conversation_and_not_the_old_intro():
 @pytest.fixture()
 def building(monkeypatch, tmp_path):
     from smritilila import adhisthana
-    from smritilila.routes import loka
     from smritilila.worlds_registry import load_worlds_registry
 
     cfg = tmp_path / "worlds.json"
@@ -214,9 +213,9 @@ def building(monkeypatch, tmp_path):
     async def make_db(name):
         w.made.append(name)
         return "tide_hall", "postgresql+asyncpg://x/tide_hall"
-    monkeypatch.setattr(loka, "_make_world_database", make_db)
-    monkeypatch.setattr(loka, "_free_world_port", lambda: 8230)
-    monkeypatch.setattr(loka, "_spawn_world_server", lambda entry: w.spawned.append((entry.name, entry.port)))
+    monkeypatch.setattr(adhisthana, "make_world_database", make_db)
+    monkeypatch.setattr(adhisthana, "free_world_port", lambda: 8230)
+    monkeypatch.setattr(adhisthana, "spawn_world_server", lambda entry: w.spawned.append((entry.name, entry.port)))
 
     def http(method, url, body=None, timeout=30.0):
         w.calls.append((method, url, body))
@@ -398,7 +397,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64    # not a real image: listing and copyin
 
 @pytest.fixture()
 def maps(monkeypatch, tmp_path):
-    from smritilila.routes import pratistha
+    from smritilila import paths
     root = tmp_path / "maps"
     (root / "Stonemarch" / "deeper").mkdir(parents=True)
     (root / "Tide Hall").mkdir()
@@ -406,7 +405,7 @@ def maps(monkeypatch, tmp_path):
                        (root / "Stonemarch" / "empty.png", b""), (root / "Stonemarch" / "deeper" / "two_deep.png", PNG), (root / "Tide Hall" / "coast.JPG", PNG),
                        (root / "loose.png", PNG)):
         path.write_bytes(data)
-    monkeypatch.setattr(pratistha, "MAPS_DIR", root)
+    monkeypatch.setattr(paths, "MAPS_DIR", root)
     return root
 
 
@@ -469,13 +468,13 @@ def test_a_model_that_cannot_see_is_refused_plainly_and_an_unsaved_map_never_rea
 
 
 def test_a_build_has_each_picked_map_copied_into_the_new_world_and_read_there(client, building, maps):
-    from smritilila.backup import _safe_dirname
+    from smritilila.backup import safe_dirname
     (maps / "Tide Hall" / "atlas.png").write_bytes(PNG + b"1")                                                # another map by the same file name
     body = {"name": "Tide Hall", "draft": BRIEF, "messages": [], "maps": ["Stonemarch/atlas.png", "Tide Hall/atlas.png"]}
     s = status(client, build(client, body).json()["job"]).json()
     assert s["done"] and s["error"] is None
     assert s["result"]["maps"] == [{"image": "atlas.png", "proposal": "p1abc", "error": None}, {"image": "Tide Hall-atlas.png", "proposal": "p1abc", "error": None}]
-    mine = maps / _safe_dirname("Tide Hall")
+    mine = maps / safe_dirname("Tide Hall")
     assert (mine / "atlas.png").read_bytes() == PNG and (mine / "Tide Hall-atlas.png").read_bytes() == PNG + b"1"
     posted = [(c[1], c[2]) for c in building.calls if c[1].endswith("/world/manacitra")]
     assert posted == [("http://127.0.0.1:8230/world/manacitra", {"image": "atlas.png"}), ("http://127.0.0.1:8230/world/manacitra", {"image": "Tide Hall-atlas.png"})]

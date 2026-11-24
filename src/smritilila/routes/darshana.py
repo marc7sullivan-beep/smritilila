@@ -14,7 +14,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 
 from smritilila import adhisthana  # the services, called through it so a test's patch there reaches them
-from smritilila.adhisthana import _store
+from smritilila.adhisthana import store_of
 from smritilila.smrti.context import NOWHERE
 from smritilila.schemas import (
     Anusmrti, AnusmrtiOut, EntityMemories, EntityMemoryOut, EntityRecap, EntityScene, WitnessedResponse,
@@ -84,7 +84,7 @@ async def entity_recap(entity_id: str) -> EntityRecap:
     location_id, _ = world.here(entity_id, absent=False)  # v3: where their tuples last record them
     if location_id == NOWHERE:
         location_id = None
-    last_memory = await _store(world).last_memory_for(entity_id)
+    last_memory = await store_of(world).last_memory_for(entity_id)
     return EntityRecap(location_id=location_id, last_narration=last_memory.experience if last_memory is not None else None)
 
 

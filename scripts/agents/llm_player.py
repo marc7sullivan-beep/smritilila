@@ -10,7 +10,11 @@ it with `act`; a question about jumping ahead in time is answered YES or NO. The
 (`best_available_client`: the first configured provider, in its own order of preference, see llm/providers.py); SMRITILILA_BOT_MODEL names another model id. It makes
 LLM calls, so it costs. Whenever it ends, for any reason, the character is left waiting and offline (the tool's `stop`).
 
-What the model is shown is the character's own page and the last few tellings: nothing from above, as the agent-player prompt has always held.
+What the model is shown is the character's own page, read afresh from the world on every turn, and the moment (the telling just handed over, the open round, or
+the question): nothing from above, as the agent-player prompt has always held. NOTHING IS CARRIED FROM ONE TURN TO THE NEXT (Marc, 2026-11-02: "clear the context
+window and rebuild from memories and our subagent prompt only"): no earlier telling, no earlier action, no notes. What a window used to carry the world holds:
+the page has the character's memories, the tuple of a round is written in the pulse that tells it, and the tool's `watch` reads from the round whether the
+character has already acted in it (WAITING), so the model is never asked to act twice in one round.
 """
 from __future__ import annotations
 
@@ -31,10 +35,10 @@ import player_tool  # noqa: E402
 
 OTHERS = "A person may be here, and others too; you act together in rounds."
 NO_NOTE = "(No note was written for this world. You know only what your character's page shows you.)"
-KEEP = 4               # the last tellings and actions the model is reminded of
 MAX_REPLY = 600        # characters of one action
 TRIES = 3              # asks of the model before the character is left waiting
 _FOOTER = re.compile(r"^\[.+: \d+ of \d+ actions\]")
+_FOR_THE_AGENT = re.compile(r"^(Decide the next action now, from this and from your notes\.|Answer it with `confirm yes` or `confirm no`.*)$")   # the tool's lines to an agent that keeps notes and runs commands
 
 
 class ModelUnavailable(Exception):
@@ -53,11 +57,12 @@ def call(folder: Path | str, *args: str) -> str:
 
 
 def clean(out: str) -> str:
-    """The tool's output without its closing line (the rule for an agent that reads it; the model is shown the page, not the rule)."""
+    """The tool's output without its closing line (the rule for an agent that reads it; the model is shown the page, not the rule) and without the lines
+    it says to an agent that keeps notes and runs commands."""
     lines = out.strip().splitlines()
     if lines and _FOOTER.match(lines[-1]):
         lines.pop()
-    return "\n".join(lines).strip()
+    return "\n".join(ln for ln in lines if not _FOR_THE_AGENT.match(ln.strip())).strip()
 
 
 def note_for(world: str) -> str:
@@ -97,12 +102,9 @@ def ask(client, system: str, user: str, max_tokens: int = 400) -> str:
     raise ModelUnavailable(str(last))
 
 
-def compose(name: str, look: str, recent: list[str], now: str) -> str:
-    parts = [look]
-    if recent:
-        parts.append("JUST NOW (oldest first):\n" + "\n\n".join(recent[-2 * KEEP:]))
-    parts += [now, f"What does {name} do next?"]
-    return "\n\n".join(p for p in parts if p)
+def compose(name: str, look: str, now: str) -> str:
+    """What the model is asked on one turn: the page as the world has it now, and the moment. Nothing of an earlier turn."""
+    return "\n\n".join(p for p in (look, now, f"What does {name} do next?") if p)
 
 
 def play(folder: Path | str, eid: str, name: str, port: int, world: str, max_actions: int, idle: int, client, run=call) -> str:
@@ -110,7 +112,6 @@ def play(folder: Path | str, eid: str, name: str, port: int, world: str, max_act
     folder = Path(folder)
     system = system_prompt(name, world)
     run(folder, "init", "--id", eid, "--name", name, "--port", str(port), "--max", str(max_actions), "--idle", str(idle))
-    recent: list[str] = []
     try:
         while True:
             try:
@@ -129,27 +130,22 @@ def play(folder: Path | str, eid: str, name: str, port: int, world: str, max_act
                 continue                                           # the top of the loop sees the same condition and stops
             if now.startswith("HOLD"):
                 continue                                           # the time guard: a person is not ahead of the character, so nothing is theirs to open; no model is asked
+            if now.startswith("WAITING"):
+                continue                                           # the character has acted in the open round and the others have not: the world says so, so no model is asked
             look = clean(run(folder, "look"))
             if "A QUESTION is waiting" in now:
-                answer = ask(client, system, compose(name, look, recent, now) + "\nAnswer YES or NO.", max_tokens=10)
-                told = clean(run(folder, "confirm", "yes" if answer.strip().lower().startswith("y") else "no"))
-                recent.append(told[:1500])
+                answer = ask(client, system, compose(name, look, now) + "\nAnswer YES or NO.", max_tokens=10)
+                run(folder, "confirm", "yes" if answer.strip().lower().startswith("y") else "no")
                 continue
-            user = compose(name, look, recent, now)
-            if now.startswith("TOLD"):
-                recent.append(now[:1500])                          # kept for the turns after this one; this turn shows it as `now`
-            text = action_from(ask(client, system, user))
+            text = action_from(ask(client, system, compose(name, look, now)))
             (folder / "next_action.txt").write_text(text, encoding="utf-8")   # the tool reads it, so no action is ever read as an option
             res = clean(run(folder, "act"))
             if res.startswith("HOLD"):
-                continue                                           # not posted, not counted (the tool kept the action file): nothing was done, so nothing is remembered as done
-            recent.append(f"{name} did: {text}")
-            if "YOU WERE LAST TO ACT" in res:
-                recent.append(res[:1500])
+                continue                                           # not posted, not counted (the tool kept the action file): nothing was done
             if "A QUESTION is waiting" in res:                     # a jump the action itself raised: answered now, since a new action in its place would count as no
-                answer = ask(client, system, compose(name, look, recent, res) + "\nAnswer YES or NO.", max_tokens=10)
-                told = clean(run(folder, "confirm", "yes" if answer.strip().lower().startswith("y") else "no"))
-                recent.append(told[:1500])
+                look = clean(run(folder, "look"))                  # the page again, not the one from before the action: the world has moved
+                answer = ask(client, system, compose(name, look, res) + "\nAnswer YES or NO.", max_tokens=10)
+                run(folder, "confirm", "yes" if answer.strip().lower().startswith("y") else "no")
     except ModelUnavailable as e:
         run(folder, "stop", "--told")
         return f"the model could not be reached ({e})"

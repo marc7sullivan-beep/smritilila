@@ -103,7 +103,7 @@ def test_the_model_plays_the_character_to_the_limit_then_the_character_is_left_w
     system, user = model.seen[0]
     assert "Teo" in system and "I was pulled from the river by Nara." in user                    # the page, as the character's own
     assert "NOT A STOP" not in user and "Run `stop`" not in user                                  # the rule is for an agent that reads the tool, not for the model
-    assert "I look at Nara and wait." in model.seen[1][1]                                         # the second turn remembers the first
+    assert "I look at Nara and wait." not in model.seen[1][1]                                     # the second turn does not carry the first: the page is all it has
 
 
 def test_a_telling_is_shown_to_the_model_on_the_turn_that_answers_it(lp, stub, tmp_path):
@@ -213,7 +213,7 @@ def test_a_held_character_asks_the_model_nothing_and_acts_the_moment_a_person_is
     assert [b["action_text"] for b in stub.posted("/pulses")] == ["I follow the road."]
 
 
-def test_an_action_the_tool_held_is_not_remembered_as_done(lp, stub, tmp_path):
+def test_an_action_the_tool_held_is_neither_posted_nor_counted(lp, stub, tmp_path):
     stub.sync = [{"entity_id": ID, "label": "Teo", "at": 100}]
     state = {"first": True}
     real = lp.call
@@ -225,9 +225,70 @@ def test_an_action_the_tool_held_is_not_remembered_as_done(lp, stub, tmp_path):
         return real(folder, *args)
 
     model = FakeModel(["I knock.", "I knock again."])
-    lp.play(tmp_path / ID, ID, "Teo", stub.port, "Austin", 1, 30, model, run=run)
-    assert "Teo did: I knock." not in model.seen[1][1]                           # refused, so the next turn is not told it happened
+    reason = lp.play(tmp_path / ID, ID, "Teo", stub.port, "Austin", 1, 30, model, run=run)
+    assert reason == "1 actions taken"                                           # the refused action did not count
     assert [b["action_text"] for b in stub.posted("/pulses")] == ["I knock again."]
+
+
+def test_nothing_is_carried_from_one_turn_to_the_next(lp, stub, tmp_path):
+    """Marc, 2026-11-02: "clear the context window and rebuild from memories and our subagent prompt only". Each ask is the same system prompt and this turn's page
+    and moment: no earlier telling, no earlier reply."""
+    stub.round.update({"told": "TELLING-ONE the ferry swings.", "open": True})
+    tellings = ["TELLING-ONE the ferry swings.", "TELLING-TWO the rope parts.", "TELLING-THREE the bank rises."]
+    replies = ["REPLY-ONE I hold the rope.", "REPLY-TWO I call to Nara.", "REPLY-THREE I jump."]
+
+    def next_telling(_user):                                                     # the world tells the next thing while the model is asked
+        n = len(model.seen)
+        if n < len(tellings):
+            stub.round["told"] = tellings[n]
+
+    model = FakeModel(replies, on_ask=next_telling)
+    assert _play(lp, stub, tmp_path, model, max_actions=3) == "3 actions taken"
+    assert len(model.seen) == 3 and len({system for system, _ in model.seen}) == 1                 # one prompt, every time
+    for i, (system, user) in enumerate(model.seen):
+        assert tellings[i] in user and "I was pulled from the river by Nara." in user              # this turn's telling and the page
+        for j in range(3):
+            if j != i:
+                assert tellings[j] not in user and replies[j] not in user, (i, j)                  # nothing of any other turn
+        assert not any(r in user for r in replies)                                                 # not even the character's own earlier words
+
+
+def test_the_page_is_read_again_for_every_ask_and_after_an_action_before_a_jump_question(lp, stub, tmp_path):
+    stub.pulse_answer = {"confirm": {"kind": "long", "prompt": "You are about to jump ahead 1 h. Proceed?", "minutes": 60, "to": 160}, "narrations": {}, "round": None}
+    model = FakeModel(["I sleep.", "YES"])
+    lp.play(tmp_path / ID, ID, "Teo", stub.port, "Austin", 1, 30, model)
+    looks = [p for m, p, b in stub.requests if m == "GET" and p.endswith("/anusmrti")]
+    assert len(looks) == 2                                                       # once for the action, once more for the question the action raised
+    assert "You are about to jump ahead 1 h" in model.seen[1][1]                 # the question, with the action's own answer (this turn's moment), on a page read after it
+
+
+def test_a_character_that_has_acted_in_the_open_round_is_not_asked_to_act_again(lp, stub, tmp_path):
+    """The model keeps nothing, so the world says it: the round is open and the character has acted. No model call is made until that changes."""
+    stub.round.update({"open": True, "acted": True})
+    waits = {"n": 0}
+    real = lp.call
+
+    def run(folder, *args):
+        out = real(folder, *args)
+        if args and args[0] == "watch" and out.startswith("WAITING"):
+            waits["n"] += 1
+            if waits["n"] == 3:                                                  # the others act; the round is written
+                stub.round.update({"open": False, "acted": False})
+        return out
+
+    model = FakeModel(["I follow the road."])
+    reason = lp.play(tmp_path / ID, ID, "Teo", stub.port, "Austin", 1, 30, model, run=run)
+    assert reason == "1 actions taken" and waits["n"] == 3
+    assert len(model.seen) == 1                                                  # three WAITINGs cost nothing
+    assert [b["action_text"] for b in stub.posted("/pulses")] == ["I follow the road."]
+
+
+def test_the_tools_lines_to_an_agent_with_notes_are_not_shown_to_the_model(lp):
+    out = "TOLD (handed over once; kept in tellings.log):\nNara pulls the oars.\nDecide the next action now, from this and from your notes.\n[Teo: 1 of 3 actions] NOT A STOP."
+    shown = lp.clean(out)
+    assert "Nara pulls the oars." in shown and "notes" not in shown and "NOT A STOP" not in shown
+    ask = "A QUESTION is waiting, as the character would answer it: Jump ahead 1 h?\nAnswer it with `confirm yes` or `confirm no`. Never send a new action instead: it throws the telling away."
+    assert "Jump ahead 1 h?" in lp.clean(ask) and "confirm" not in lp.clean(ask)
 
 
 def test_a_jump_question_that_comes_back_with_an_action_is_answered_not_thrown_away(lp, stub, tmp_path):

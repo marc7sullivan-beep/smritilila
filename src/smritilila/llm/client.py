@@ -33,7 +33,7 @@ from smritilila.training_data import log_example
 # event -- a response-time deep dive tried to attribute individual calls to
 # pulses by POSITION in telemetry.jsonl (between consecutive pulse.timing
 # markers) and got it wrong for exactly the pulses where the PREVIOUS
-# pulse's own deferred activation (routes/spanda.py's _run_smrti_activation_in_
+# pulse's own deferred activation (spanda.py's _run_smrti_activation_in_
 # background, genuinely running on a separate thread via asyncio.to_thread)
 # was still finishing: two threads' log lines interleaving in true
 # execution order, not the clean sequential blocks positional attribution
@@ -58,14 +58,14 @@ from smritilila.training_data import log_example
 # own worker thread. None outside any bound scope (world seeding at
 # genesis, a world's expansion) -- accurate,
 # not a guess: those calls genuinely aren't part of any one pulse.
-_pulse_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("smritilila_llm_pulse_id", default=None)
+pulse_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("smritilila_llm_pulse_id", default=None)
 # Which door this call came through: "primary", "secondary" (a rotation
 # sent it there on purpose) or "fallback" (the other one failed). Same
 # ContextVar mechanism as the pulse id, and for the same reason -- the
 # alternative is inferring it from the position of two event types in
 # the record, which is the attribution this project has already been
 # burned by. One field on llm.call answers it instead.
-_route_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("smritilila_llm_route", default="primary")
+route_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("smritilila_llm_route", default="primary")
 # Shared by every RotatingClient in the process -- see RotatingClient._pick.
 _rotation_n = itertools.count(1)
 # the pick a caller planned for its next call (plan(), then the call): the model that will narrate is known before
@@ -84,7 +84,7 @@ def bind_pulse_id(pulse_id: str | None) -> None:
     context -- the only failure mode a reset would guard against.
     (A per-pulse call count rode along here until 2026-09-30; nothing had
     read it since v2's call budget went.)"""
-    _pulse_id_ctx.set(pulse_id)
+    pulse_id_ctx.set(pulse_id)
 
 
 def current_pulse_id() -> str | None:
@@ -101,7 +101,7 @@ def current_pulse_id() -> str | None:
 
     None outside a pulse, which is an honest answer and not a gap.
     """
-    return _pulse_id_ctx.get()
+    return pulse_id_ctx.get()
 
 
 # Seconds a hosted call may take before it is given up on. Raised from 60 on 2026-09-13 after a call for an 85-participant scene timed out: a
@@ -189,7 +189,7 @@ def resolve_for(system: str, model: str) -> tuple[str, str | None]:
     return str(system), "default"
 
 
-def _prompt_field(prompt: str | None) -> dict:
+def prompt_field(prompt: str | None) -> dict:
     """llm.call's `prompt`: which of a Anurupa's variants was sent --
     absent for a plain prompt, so the record of every other role is as it
     was."""
@@ -200,7 +200,7 @@ def _json_instruction(schema: dict) -> str:
     return JSON_INSTRUCTION.format(schema=json.dumps(schema, indent=1))
 
 
-def _complete_json(client, system: str, user: str, *, input_schema: dict, max_tokens: int, images: "Sequence[Picture] | None" = None) -> dict:
+def complete_json(client, system: str, user: str, *, input_schema: dict, max_tokens: int, images: "Sequence[Picture] | None" = None) -> dict:
     """complete_json for any provider: the same answer complete_with_tool
     returns, without asking the provider to enforce the shape (see the
     note above LLMClient). Built on the client's own complete(), so there
@@ -215,11 +215,11 @@ def _complete_json(client, system: str, user: str, *, input_schema: dict, max_to
     try:
         out = _parse_json_object(text)
     except Exception as exc:
-        log_event("llm.json", pulse_id=_pulse_id_ctx.get(), model=client.model,
-                  route=_route_ctx.get(), ok=False, error=repr(exc)[:200], chars=len(text or ""))
+        log_event("llm.json", pulse_id=pulse_id_ctx.get(), model=client.model,
+                  route=route_ctx.get(), ok=False, error=repr(exc)[:200], chars=len(text or ""))
         raise
-    log_event("llm.json", pulse_id=_pulse_id_ctx.get(), model=client.model,
-              route=_route_ctx.get(), ok=True, chars=len(text or ""), fields=sorted(out))
+    log_event("llm.json", pulse_id=pulse_id_ctx.get(), model=client.model,
+              route=route_ctx.get(), ok=True, chars=len(text or ""), fields=sorted(out))
     return out
 
 
@@ -267,7 +267,7 @@ def _parse_json_object(text: str) -> dict:
 _JSON_TYPES = {"array": list, "object": dict}
 
 
-def _unstring(out: object, schema: dict, tool_name: str, model: str) -> object:
+def unstring(out: object, schema: dict, tool_name: str, model: str) -> object:
     """A top-level field the schema declares an array or an object that came
     back as JSON text is decoded (2026-10-01: the mid-size model returned a seed's whole
     `places` array as a string in 3 of 12 draws, and the birth failed with
@@ -290,7 +290,7 @@ def _unstring(out: object, schema: dict, tool_name: str, model: str) -> object:
             out = {**out, name: decoded}
             fixed.append(name)
     if fixed:
-        log_event("llm.unstringed", pulse_id=_pulse_id_ctx.get(), model=model, tool_name=tool_name, fields=fixed)
+        log_event("llm.unstringed", pulse_id=pulse_id_ctx.get(), model=model, tool_name=tool_name, fields=fixed)
     return out
 
 
@@ -321,6 +321,16 @@ class LLMClient(Protocol):
     ) -> dict: ...
 
 
+class Painter(Protocol):
+    """Whatever makes a picture (ābhāsa, 2026-11-11): `paint` takes the words and, if there is one, a seed picture (the portraits of whoever is in
+    it, appended into one image), and returns the picture made -- or None when the model declined to make one (its safety filter). A call that
+    fails for any other reason raises. The engine knows no vendor; llm/providers.py finds the one that is configured."""
+
+    model: str
+
+    def paint(self, prompt: str, *, seed: "Picture | None" = None, aspect: str = "16:9") -> "Picture | None": ...
+
+
 # -- what a response says about how the call stopped and what it cost, per backend (llm.call telemetry)
 #
 # Each backend registers two readers for its own response shape. Both are best-effort and never raise: a missing figure is far cheaper than
@@ -332,7 +342,7 @@ def register_backend(name: str, finish: Callable[[object], "str | None"], usage:
     _BACKENDS[name] = (finish, usage)
 
 
-def _finish_of(response: object | None, backend: str) -> str | None:
+def finish_of(response: object | None, backend: str) -> str | None:
     """Why the model stopped, for llm.call (added 2026-09-22, from a rotated pulse whose JSON came back truncated: the record could say only THAT it
     stopped early, not why). Never raises."""
     if response is None or backend not in _BACKENDS:
@@ -343,7 +353,7 @@ def _finish_of(response: object | None, backend: str) -> str | None:
         return None
 
 
-def _usage_fields(response: object | None, backend: str) -> dict[str, object]:
+def usage_fields(response: object | None, backend: str) -> dict[str, object]:
     """Best-effort token and cache usage for llm.call (added 2026-09-14). response=None (the call raised before returning one) or any unexpected
     shape gives {} and never raises."""
     if response is None or backend not in _BACKENDS:
@@ -374,7 +384,7 @@ class OpenAICompatClient:
     server, LM Studio, or any `/v1/chat/completions`. No new dependency: the standard library speaks to it.
 
     It does plain completion, and answers `complete_json` as text JSON built on its own `complete` (the one path the engine has for a
-    model that cannot be forced to a shape; see `_complete_json`). Wrap it in `JsonShapedClient` to sit where a tool-calling model
+    model that cannot be forced to a shape; see `complete_json`). Wrap it in `JsonShapedClient` to sit where a tool-calling model
     sits: `local_client_from_env` does. An open model's "thinking" (`<think>...</think>`) is dropped from the answer.
 
         SMRITILILA_LOCAL_BASE_URL   e.g. http://localhost:11434/v1 (Ollama), http://localhost:8000/v1 (vLLM)
@@ -419,20 +429,20 @@ class OpenAICompatClient:
             text = ((response.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
             text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
             if not text:
-                raise RuntimeError(f"empty completion from model (finish_reason={_finish_of(response, 'openai')!r})")
+                raise RuntimeError(f"empty completion from model (finish_reason={finish_of(response, 'openai')!r})")
             log_example(backend="openai", tool_name=None, system=system, user=logged_user(user, images), input_schema=None, output=text,
-                        model=self.model, reasoning={}, pulse_id=_pulse_id_ctx.get())
+                        model=self.model, reasoning={}, pulse_id=pulse_id_ctx.get())
             return text
         except Exception as exc:
             _error = type(exc).__name__
             raise
         finally:
-            log_event("llm.call", backend="openai", model=self.model, reasoning={}, route=_route_ctx.get(), finish=_finish_of(response, "openai"),
-                      method="complete", duration_ms=int((time.monotonic() - _start) * 1000), error=_error, pulse_id=_pulse_id_ctx.get(),
-                      **_prompt_field(prompt), **_usage_fields(response, "openai"))
+            log_event("llm.call", backend="openai", model=self.model, reasoning={}, route=route_ctx.get(), finish=finish_of(response, "openai"),
+                      method="complete", duration_ms=int((time.monotonic() - _start) * 1000), error=_error, pulse_id=pulse_id_ctx.get(),
+                      **prompt_field(prompt), **usage_fields(response, "openai"))
 
     def complete_json(self, system: str, user: str, *, input_schema: dict, max_tokens: int = 8192, images: "Sequence[Picture] | None" = None) -> dict:
-        return _complete_json(self, system, user, input_schema=input_schema, max_tokens=max_tokens, images=images)
+        return complete_json(self, system, user, input_schema=input_schema, max_tokens=max_tokens, images=images)
 
     def complete_with_tool(self, system: str, user: str, *, tool_name: str, tool_description: str, input_schema: dict, max_tokens: int = 8192,
                            images: "Sequence[Picture] | None" = None) -> dict:
@@ -554,7 +564,7 @@ class RotatingClient:
 
         The count is the PROCESS's, not this instance's (fixed
         2026-09-22, same evening it was written). adhisthana.py's
-        _resolve_roles builds a fresh RotatingClient on every request, so
+        resolve_roles builds a fresh RotatingClient on every request, so
         an instance counter reset to 1 each time and, at share 0.1,
         int(1 * 0.1) never exceeded int(0 * 0.1) -- the secondary's turn
         never came and ten live pulses rotated zero times. It passed
@@ -590,16 +600,16 @@ class RotatingClient:
         if planned is not None:
             _planned_ctx.set(None)
         first, other, route = planned if planned is not None else self._pick()
-        token = _route_ctx.set(route)
+        token = route_ctx.set(route)
         try:
             return getattr(first, method)(*args, **kwargs)
         except Exception as exc:
             print(f"RotatingClient: {route} failed ({exc!r}), retrying via the other", flush=True)
-            log_event("llm.rotation_fallback", pulse_id=_pulse_id_ctx.get(), tried=route, error=repr(exc)[:200])
-            _route_ctx.set("fallback")
+            log_event("llm.rotation_fallback", pulse_id=pulse_id_ctx.get(), tried=route, error=repr(exc)[:200])
+            route_ctx.set("fallback")
             return getattr(other, method)(*args, **kwargs)
         finally:
-            _route_ctx.reset(token)
+            route_ctx.reset(token)
 
     def complete_json(self, *args, **kwargs) -> dict:
         return self._run("complete_json", *args, **kwargs)

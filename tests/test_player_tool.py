@@ -159,6 +159,16 @@ def test_a_lull_is_not_a_stop_and_the_watch_says_whose_move_it_is(tool, capsys):
     assert "NOTHING OPENED" in out and "It is yours to open" in out and "NOT A STOP" in out and "STOP CONDITION" not in out
 
 
+def test_a_character_that_has_acted_in_the_open_round_is_told_to_wait_not_to_open_another(tool, capsys):
+    """2026-11-02: an agent that keeps nothing between turns cannot remember it has acted; the round says so (a second action replaces the first)."""
+    capsys.readouterr()
+    tool.stub.round.update({"open": True, "acted": True})
+    assert tool("watch") == 0
+    out = _out(capsys)
+    assert "WAITING:" in out and "has acted in the open round" in out and "run `watch` again" in out
+    assert "NOTHING OPENED" not in out and "It is yours to open" not in out and "STOP CONDITION" not in out
+
+
 def test_a_question_is_surfaced_and_answered_not_replaced_by_an_action(tool, capsys):
     capsys.readouterr()
     tool.stub.round["confirm"] = "You are about to jump ahead 15 min. Proceed?"

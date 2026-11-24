@@ -28,7 +28,7 @@ counted from the first ("the second day, 5:00 in the morning") -- and:
 - THE MIRROR. A span already lived in a scene by others is shown to a pulse
   that passes through it, which must hold it.
 - EVERY JUMP IS CONSENTED TO (the prompts are smrti/pulse.py's, `locked_prompt`
-  and a long jump's `pending`; the consent is routes/spanda.py's, `_confirmed`).
+  and a long jump's `pending`; the consent is spanda.py's, `confirmed`).
 - NPCs FOLLOW AND NEVER LEAD (pravrtti.py's kāla gate, from `clock`).
 
 The clock logic here is numbers of minutes, never read for meaning (s0);
@@ -545,7 +545,7 @@ def near_line(kala: Kala, lived: list[tuple[int, str, str]]) -> str:
 
 
 def window_line(kala: Kala, events: list[tuple[int, str, str]]) -> str:
-    """What the world did in the time a long action takes (routes/spanda.py's
+    """What the world did in the time a long action takes (spanda.py's
     window turns, run before the actor lives it): the action is lived up to
     the first of these that reaches the actor, and stops there."""
     return ("IN THE TIME THIS ACTION WOULD TAKE, THESE HAPPEN (they happened, in this order; the action goes on only until "
@@ -575,7 +575,7 @@ def interruption_chance(minutes: int, mean_hours: float | None) -> float:
 
 
 def interruption_line(kala: Kala, minute: int, where: str, minutes_in: int) -> str:
-    """What the Narrator is shown of a long jump that is interrupted (routes/spanda.py's `_interruption` drew the minute): the engine says only
+    """What the Narrator is shown of a long jump that is interrupted (spanda.py's `_interruption` drew the minute): the engine says only
     that something does, and when and where -- it knows no kind (s0); what it is is the Narrator's, as a quiet scene's arrival is (rule B).
     The action is lived up to the minute and stops there, as at the first of a window's events."""
     return (f"SOMETHING INTERRUPTS THIS ACTION at {kala.say(minute)}, in {where}, {span_said(max(1, minutes_in))} into it: the action is lived "
@@ -648,7 +648,7 @@ def changes_in(kosha, kala: Kala, scene: str, t: int, now_tick: int, perceivers:
     return out
 
 
-def _minutes(elapsed: object) -> int:
+def minutes(elapsed: object) -> int:
     try:
         e = int(float(elapsed))
     except (TypeError, ValueError):

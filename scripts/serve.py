@@ -138,7 +138,7 @@ async def _setup(seed: bool) -> int:
     else:
         print(f"The database {name!r} is there.")
     from smritilila import adhisthana
-    await adhisthana._bring_to_head(url)
+    await adhisthana.bring_to_head(url)
     print("The schema is at the current version.")
     if seed:
         from sqlalchemy import func, select

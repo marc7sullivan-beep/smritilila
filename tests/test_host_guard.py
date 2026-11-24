@@ -1,6 +1,6 @@
 # Copyright 2026 Marc Sullivan
 # SPDX-License-Identifier: Apache-2.0
-"""The Host allow-list at the door (dvara._host_refusal, called first in main.guest_gate).
+"""The Host allow-list at the door (dvara.host_refusal, called first in main.guest_gate).
 
 The threat it answers: a web page in the owner's browser, with DNS rebinding, reaches 127.0.0.1 under the attacker's
 own name and may send any header -- cf-access-authenticated-user-email: <owner> included. Every header the gate trusts
@@ -97,7 +97,7 @@ def test_local_and_tunnel_hosts_pass_the_door():
 
 def test_a_missing_host_is_refused():
     # HTTP/1.0 without Host: nothing real sends this to a server that is only reached by name
-    assert dvara._host_refusal(_request(None)).status_code == 400
+    assert dvara.host_refusal(_request(None)).status_code == 400
 
 
 def test_refusal_is_logged_once_per_host(monkeypatch):

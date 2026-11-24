@@ -260,7 +260,7 @@ def heavier(t: Tuple) -> int:
     return min(t.salience, USE_RUNG.get(t.use or "", 9))
 
 
-def _relevance(t: Tuple, q: np.ndarray | None) -> float:
+def relevance(t: Tuple, q: np.ndarray | None) -> float:
     if q is None or t.embedding is None:
         return 0.0
     e = np.asarray(t.embedding)
@@ -1005,7 +1005,7 @@ def retrieve(
             # model scored vocabulary -- "damp", "hum" -- over situation, and
             # left the trapped miner sixth; weight brought him fourth)
             def loud(t: Tuple) -> float:
-                return max(_relevance(t, a) for a in anchors) * (1 + 0.15 * (4 - t.salience))
+                return max(relevance(t, a) for a in anchors) * (1 + 0.15 * (4 - t.salience))
             best = max(lately, key=loud)
             scored.append((loud(best), p, ps, best))
         for _score, _p, ps, best in sorted(scored, key=lambda x: (-x[0], x[1]))[:REACHING]:
@@ -1035,7 +1035,7 @@ def retrieve(
         ctx.add(t)
     ctx.phase = "own_keys"
     keys = [t for t in (log.keys_of(actor) if whole_own else own[:-1]) if t.use == "key" and t not in drama]
-    for t in sorted(keys, key=lambda t: -_relevance(t, query_embedding))[:KEY_ALLOWANCE]:
+    for t in sorted(keys, key=lambda t: -relevance(t, query_embedding))[:KEY_ALLOWANCE]:
         ctx.add(t)
     # ... and what those PRESENT cannot forget (Vadhu tick 345) -- by the
     # heavier of their two words, so a read document's key lines come

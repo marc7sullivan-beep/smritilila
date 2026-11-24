@@ -157,7 +157,7 @@ PREVIEW_TOOL = {
 }
 
 
-def _builder_client():
+def builder_client():
     """The model that builds: the best one, not the rotation (low volume, owner only). the first provider's primary, or SMRITILILA_BUILDER_MODEL;
     with no the first provider key, a local model if one is configured, else the second model (smritilila.llm.providers.best). Tests replace this."""
     from smritilila.llm.client import best_available_client
@@ -172,7 +172,7 @@ def _owner_only(request: Request, what: str) -> str | None:
     """Who may use the builder: the owner, or a registered user the owner has enabled for it (2026-10-06). The gate already refuses
     anyone else; this is the endpoint's own word, so it holds if the gate's list is ever edited. Returns the user's email, or None for
     an owner."""
-    guest = dvara._guest(request)
+    guest = dvara.guest_of(request)
     if guest is not None and not users_registry.may_build(guest):
         log_event("guest.refused", guest=guest, method="POST", path=request.url.path, reason="builder")
         raise HTTPException(403, f"only the owner, or a user the owner has enabled, {what}")
@@ -238,8 +238,8 @@ NEEDS_IMAGES = "A map needs a model that takes images; none of the configured on
 
 
 def _maps_dir() -> Path:
-    from smritilila.routes import pratistha  # its MAPS_DIR: one place for maps, which a test replaces there
-    return pratistha.MAPS_DIR
+    from smritilila import paths  # its MAPS_DIR: one place for maps, which a test replaces there
+    return paths.MAPS_DIR
 
 
 def saved_maps() -> list[dict]:
@@ -286,14 +286,14 @@ def _look(ids: list[str]) -> list:
 def _vision_client():
     """The model that looks at a map: the seed writer's own choice, the one that takes pictures first and the other only if it fails
     (the same as the map reading a build makes). Tests replace this."""
-    from smritilila.routes.bija import _seeder
+    from smritilila.udbhava import seeder
     try:
-        roles = adhisthana._resolve_roles()
+        roles = adhisthana.resolve_roles()
     except (KeyError, ValueError):
         roles = None
     if roles is None or roles.smrti_client is None:
         raise HTTPException(503, "no model is configured for the builder. " + NEEDS_IMAGES)
-    return _seeder(roles.smrti_client)
+    return seeder(roles.smrti_client)
 
 
 def _image_extension(data: bytes) -> str | None:
@@ -377,7 +377,7 @@ async def builder_turn(req: BuilderTurnRequest, request: Request) -> BuilderTurn
                + ", ".join(p.name for p in pictures) + "): look at it first." if pictures else "")
             + "\n\nReply to the owner's latest message.")
     try:
-        client = _vision_client() if pictures else _builder_client()
+        client = _vision_client() if pictures else builder_client()
         out = await asyncio.to_thread(client.complete_with_tool, TURN_SYSTEM, user, tool_name="builder_turn",
                                       tool_description="Say what you say to the owner, and set what the brief now says.",
                                       input_schema=TURN_TOOL, max_tokens=3000, **({"images": pictures} if pictures else {}))
@@ -406,7 +406,7 @@ async def builder_preview(req: BuilderPreviewRequest, request: Request) -> Build
         raise HTTPException(422, "a preview needs a name, a source, and where and when")
     user = _today() + "THE BRIEF:\n" + _brief_lines(draft)
     try:
-        out = await asyncio.to_thread(_builder_client().complete_with_tool, PREVIEW_SYSTEM, user, tool_name="builder_preview",
+        out = await asyncio.to_thread(builder_client().complete_with_tool, PREVIEW_SYSTEM, user, tool_name="builder_preview",
                                       tool_description="Show what the world will open with.", input_schema=PREVIEW_TOOL, max_tokens=3000)
     except HTTPException:
         raise
@@ -511,8 +511,8 @@ MAP_SECONDS = 1800   # a map is read in several passes of several model calls ea
 def _read_maps(job: str, base: str, name: str, paths: list[Path]) -> list[dict]:
     """After the seed: each map copied into the new world's own maps folder and read there (POST /world/manacitra on its server), which
     makes a proposal and plants nothing -- a god reviews it. A map that cannot be read leaves the world built and says why."""
-    from smritilila.backup import _safe_dirname
-    dest = _maps_dir() / _safe_dirname(name)
+    from smritilila.backup import safe_dirname
+    dest = _maps_dir() / safe_dirname(name)
     done = []
     for p in paths:
         _set(job, step=f"Reading the map {p.name} (several minutes)")
@@ -557,24 +557,23 @@ def _run_build(job: str, brief: dict[str, str], messages: list[BuilderMessage], 
     failed step leaves what was made (a retry of the same name seeds the empty world it finds, never makes a second). `god`: the
     registered user who asked, who is a god of the world they make and of nothing else; None when the owner did (the owner is a god of
     every world)."""
-    from smritilila.routes import loka
     from smritilila.worlds_registry import add_world
     name = brief["name"]
     try:
         entry = next((w for w in adhisthana.get_worlds_registry() if w.name.lower() == name.lower()), None)
         if entry is None:
             _set(job, step="Making the world's own database")
-            _dbname, url = asyncio.run(loka._make_world_database(name))
-            entry = add_world(name, url, gods=(god,) if god else (), port=loka._free_world_port())
+            _dbname, url = asyncio.run(adhisthana.make_world_database(name))
+            entry = add_world(name, url, gods=(god,) if god else (), port=adhisthana.free_world_port())
             app.state.worlds_registry = None  # read the registry again
             _set(job, step="Starting its server")
-            loka._spawn_world_server(entry)
+            adhisthana.spawn_world_server(entry)
         elif not entry.port or (god and god not in entry.gods):
             raise RuntimeError(f"a world named {name!r} already exists")
         base = f"http://127.0.0.1:{entry.port}"
         if _http("GET", base + "/health", timeout=3.0)[0] != 200:
             _set(job, step="Starting its server")
-            loka._spawn_world_server(entry)
+            adhisthana.spawn_world_server(entry)
         if not _wait_health(base):
             raise RuntimeError(f"its server (port {entry.port}) did not start in {HEALTH_SECONDS} s")
         code, there = _http("GET", base + "/world/exists")

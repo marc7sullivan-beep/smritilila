@@ -132,7 +132,6 @@
   @media (max-width: 720px) {
     #columns { flex-direction: column; }
     #player-column, #entity-column { width: 100%; }
-    #act-form { position: static; }
   }
   .col-heading { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
 
@@ -145,6 +144,32 @@
   .entry.confirm { border-left-color: var(--accent); }
   .entry.confirm .yn { margin-top: 8px; display: flex; gap: 8px; }
   .entry.witnessed { border-left-style: dotted; font-style: italic; }
+  /* pictures (abhasa, Marc, 2026-11-11): a card where it arrived in the log, a gallery of all of them beneath, a lightbox on a click */
+  figure.picture { margin: 0; padding: 6px; border-radius: 6px; background: var(--panel); }
+  figure.picture img { display: block; width: 100%; max-width: 680px; border-radius: 4px; cursor: zoom-in; background: var(--bg); }
+  figure.picture.portrait img { max-width: 240px; }
+  figure.picture figcaption { margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+  #gallery { margin: 0 0 14px; }
+  #gallery summary { cursor: pointer; }
+  #gallery-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  #gallery-grid figure.picture { width: 140px; }
+  #gallery-grid figure.picture img { max-width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+  #gallery-grid figure.picture.portrait img { aspect-ratio: 3 / 4; }
+  body.no-pictures figure.picture, body.no-pictures #gallery, body.no-pictures #portrait-panel { display: none !important; }
+  #portrait-img { display: block; max-width: 260px; width: 100%; border-radius: 6px; margin: 6px 0; background: var(--bg); }
+  #portrait-asks div { margin: 2px 0; }
+  #portrait-panel textarea { width: 100%; box-sizing: border-box; }
+  /* the portrait takes over the whole window (Marc, 2026-11-16: "change the character image generation and editing to take over the entire screen... when the
+     character image is finalized then go back to the normal action and narration view"): from the first draft until "This is me -- keep it" the panel is a layer
+     over the page, the picture large with the box and buttons beneath it; keeping it (or "later") hides the panel and the view beneath is just as it was. The
+     lightbox (z-index 50) stays above it. #portrait-stage is the centred column: margin:auto in a scrolling flex box centres it without clipping its top. */
+  #portrait-panel:not(.hidden) { position: fixed; inset: 0; z-index: 40; margin: 0; border: 0; border-radius: 0; background: var(--bg); padding: 24px 20px; display: flex; overflow-y: auto; overscroll-behavior: contain; }
+  #portrait-stage { margin: auto; width: 100%; max-width: 640px; }
+  #portrait-panel:not(.hidden) #portrait-img { height: min(56vh, 680px); width: auto; max-width: 100%; object-fit: contain; margin: 10px auto; }
+  body:has(#portrait-panel:not(.hidden)) { overflow: hidden; }
+  #lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; cursor: zoom-out; }
+  #lightbox img { max-width: 100%; max-height: 90vh; border-radius: 4px; }
+  #lightbox-caption { color: #ddd; font-size: 0.9rem; }
   .entry.error { border-left-color: var(--error); color: var(--error); }
   .entry .sara-said { margin-top: 8px; font-weight: 600; }
   .entry .sara-turn { margin-top: 6px; font-style: italic; color: var(--muted); }
@@ -153,7 +178,8 @@
   .entry details summary::before { content: "\25B8 "; }
   .entry details[open] summary::before { content: "\25BE "; }
   .entry details > div { margin-top: 6px; }  /* the whole narration at full brightness; only the toggle is muted (Marc, readability) */
-  /* the whole narration only -- no pith, no fold (the short-narration setting is gone) */
+  /* short narration off: the whole narration only -- no pith, no fold */
+  /* per character: an entry is .whole when ITS character has short narration off */
   .has-fold.whole > .sara-pith, .has-fold.whole > .sara-said,
   .has-fold.whole > .sara-turn, .has-fold.whole summary { display: none; }
   .has-fold.whole details { margin-top: 0; }
@@ -174,6 +200,11 @@
   .turn-summary .arrow { display: inline-block; margin-right: 4px; }
 
   #act-form { display: flex; gap: 10px; position: sticky; bottom: 20px; }
+  /* a phone, or any touch screen: the form stays where the page puts it, and does not ride the bottom edge of the window (Marc, 2026-11-24: "the act button doesn't
+     respond when the keyboard is still up"). A phone's keyboard shrinks what is seen and not the page, so a box glued to the page's bottom edge lies under the keyboard
+     and the browser's touch handling for it goes wrong. This was meant from the first commit, as `#act-form { position: static; }` in the 720px block above, and never
+     took effect: this rule comes later and the two have the same weight, so the later one won. It comes after the sticky rule, and a test holds it there. */
+  @media (max-width: 720px), (pointer: coarse) { #act-form { position: static; } }
   /* saṅgama: who is in the round with you, and who has acted -- never what */
   #round-status { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
   #round-status .acted { color: var(--you); }
@@ -307,6 +338,11 @@
 
   <div id="new-character-view" class="panel hidden">
     <p class="muted">Arrive as someone new -- a stranger to everyone here. Say who you are, and choose where you arrive.</p>
+    <label class="nw-label" for="nc-look">Physical description</label>
+    <p class="nw-hint">Appearance and clothing: how you look, and what you wear and carry. In a world with pictures, a first draft of your portrait is painted from this once you arrive, and you can change it by asking until it is right.</p>
+    <textarea id="nc-look" rows="2" placeholder="e.g. tall and weathered, close-cropped grey hair, a scar through the left eyebrow; a patched green cloak, a boiled-leather vest, a long knife at the belt"></textarea>
+    <label class="nw-label" for="nc-self">Background information</label>
+    <p class="nw-hint">Who you are: your name, what you do, what brings you here.</p>
     <textarea id="nc-self" rows="3" placeholder="I am ... -- name, what you do, what brings you here. Every fact you state is kept."></textarea>
     <div id="nc-locations"><p class="muted">loading...</p></div>
     <div class="row" style="margin-top:8px;">
@@ -371,6 +407,10 @@
 
   <div id="play-view" class="hidden">
     <div class="row" id="player-controls">
+      <span class="control-group"><span class="muted">short narration</span>
+      <button id="short-toggle" class="toggle-switch" aria-pressed="false" title="On: the pith of each moment, the whole folded beneath. Off: always the whole narration.">off</button></span>
+      <span class="control-group"><span class="muted">pictures</span>
+      <button id="pictures-toggle" class="toggle-switch" aria-pressed="true" title="Show the pictures this world makes of its places, people and heaviest moments. Kept in this browser. Off: none are shown or fetched.">on</button></span>
       <span class="control-group"><span class="muted">offline</span>
       <button id="offline-toggle" class="toggle-switch" aria-pressed="false" title="What happens to this character when you log off. Frozen: out of the world until you come back -- nobody sees them, nothing happens to them, and their return is narrated. Waiting: they stay where they are, seen by anyone who comes, and take no turn of their own until someone interacts with them.">frozen</button></span>
       <span class="control-group"><button id="logoff-btn" class="secondary">log off</button></span>
@@ -407,7 +447,33 @@
     <div id="columns">
       <div id="player-column">
         <p class="col-heading">You</p>
+        <div id="portrait-panel" class="panel hidden">
+         <div id="portrait-stage">
+          <p class="col-heading">Your portrait</p>
+          <p class="muted" id="portrait-status"></p>
+          <img id="portrait-img" alt="Your portrait" class="hidden">
+          <div id="portrait-asks" class="muted"></div>
+          <div id="portrait-look-row">
+            <textarea id="portrait-look" rows="2" placeholder="Describe how you look: face, hair, build, what you wear and carry"></textarea>
+            <div class="row" style="margin-top:6px;"><button id="portrait-paint">Paint a draft</button></div>
+          </div>
+          <div id="portrait-say-row" class="hidden">
+            <textarea id="portrait-say" rows="2" placeholder="Tell me what to change -- e.g. make my hair grey and shorter, add a scar on my chin, a darker cloak"></textarea>
+            <p class="muted hidden" id="portrait-nudge" role="alert">Type what you want changed in the box above (it is empty), then press Change it.</p>
+            <div class="row" style="margin-top:6px;">
+              <button id="portrait-send">Change it</button>
+              <button id="portrait-back" class="secondary" title="Undo the last change">Back one</button>
+              <button id="portrait-accept" title="Keep this portrait. It is final.">This is me &mdash; keep it</button>
+              <button id="portrait-later" class="secondary" title="Hide this until you next open the page">later</button>
+            </div>
+          </div>
+         </div>
+        </div>
         <div id="player-log"></div>
+        <details id="gallery" class="hidden">
+          <summary class="muted" id="gallery-summary">Pictures</summary>
+          <div id="gallery-grid"></div>
+        </details>
         <button type="button" id="suggested-action-btn" class="suggested-action-btn" hidden></button>
         <button type="button" id="suggested-action-memory-btn" class="suggested-action-btn" hidden></button>
         <div id="round-status" class="hidden"></div>
@@ -602,12 +668,51 @@ function labelFor(entityId) {
 
 // -- Left column: the player's own narration + input --------------------
 
+// Where the screen lands when a telling arrives (Marc, 2026-11-22: "make sure the screen recenters so the narration starts at the top of the screen.
+// Right now it's scrolled down"). Every new line was scrolled to the foot of the log, the telling included, and only the answer to the player's own action
+// was then taken back to its start -- smoothly, from the foot, so anything that scrolled or reflowed the page meanwhile (a turn folding away, a picture, a
+// poll drawing a panel, the box taking focus) left it where it was: down. Now a telling is never scrolled to the foot; the screen is put with its start at
+// the top in one instant move and kept there while the page settles, until the reader takes over (a wheel, a touch, a key, a click). A page too short to
+// scroll that far is given the room it lacks below the box, so the start can reach the top.
+let topHold = null;       // { el, until }: what the screen is keeping at its top, for a few seconds after a telling comes in
+let lastTelling = null;   // the narration entry drawn last: where to hold a telling that came with no turn around it
+const TOP_HOLD_MS = 4000;
+function scrollRoom() {
+  let room = document.getElementById("scroll-room");
+  if (!room) { room = document.createElement("div"); room.id = "scroll-room"; document.getElementById("app").appendChild(room); }
+  return room;
+}
+function placeAtTop(el) {
+  const room = scrollRoom();
+  const natural = document.getElementById("app").getBoundingClientRect().bottom + window.scrollY - room.offsetHeight;   // the page as it is without the room
+  const top = Math.max(0, Math.round(el.getBoundingClientRect().top + window.scrollY));
+  const need = Math.max(0, Math.ceil(top + window.innerHeight - natural));
+  if (need !== room.offsetHeight) room.style.height = need + "px";
+  window.scrollTo(0, top);
+}
+function holdAtTop(el) {
+  if (!el || !el.isConnected) return;
+  topHold = { el, until: Date.now() + TOP_HOLD_MS };
+  placeAtTop(el);
+}
+function releaseTopHold() { topHold = null; }
+function clearScrollRoom() { const room = document.getElementById("scroll-room"); if (room) room.style.height = "0"; }
+for (const ev of ["wheel", "touchstart", "keydown", "pointerdown", "mousedown"]) window.addEventListener(ev, releaseTopHold, { passive: true, capture: true });
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => {   // the page moved under the held place (a poll drew a panel, a picture loaded, a turn folded): put it back
+    if (!topHold) return;
+    if (Date.now() > topHold.until || !topHold.el.isConnected || topHold.el.hidden) { topHold = null; return; }
+    if (Math.abs(topHold.el.getBoundingClientRect().top) > 1) placeAtTop(topHold.el);
+  }).observe(document.getElementById("app"));
+}
+
 function appendPlayerEntry(who, text, cls, sara, detail, entityId) {
   // sara (v3): the narration's pith -- what happened, the
   // one line said (verbatim), what is waiting -- is built beside the full
-  // narration, which sits beneath it in a native <details>; since 2026-10-19
-  // the pith is hidden (.whole, below), so the whole narration is what shows. Without a sara the text
-  // shows whole, as before.
+  // narration, which sits beneath it in a native <details>; with short narration on
+  // for this character the pith shows and the whole is folded, with it off (the
+  // default) the pith is hidden (.whole, below) and the whole narration shows.
+  // Without a sara the text shows whole, as before.
   const log = document.getElementById("player-log");
   const div = document.createElement("div");
   div.className = "entry" + (cls ? " " + cls : "");
@@ -635,11 +740,18 @@ function appendPlayerEntry(who, text, cls, sara, detail, entityId) {
   }
   if (sara && text && text !== sara) {
     const fold = document.createElement("details");
-    // The whole narration is what shows: no pith, no fold (Marc, 2026-10-19: the
-    // short-narration setting is gone; it was off by default). The CSS hides the
-    // pith, the said line and the summary of an entry marked .whole.
-    div.classList.add("has-fold", "whole");
-    fold.open = true;
+    // The weight decides how much you see (Marc, 2026-09-19): a moment
+    // the Narrator weighed marking or indelible (salience 1-2) opens
+    // whole; anything lighter shows the pith with the rest folded. All
+    // of it only while this character has short narration on; off (the
+    // default) the CSS hides the pith, the said line and the summary of
+    // an entry marked .whole, and the fold is open.
+    if (detail && detail.weight && detail.weight <= 2) fold.dataset.weighty = "1";
+    div.classList.add("has-fold");
+    div.dataset.entity = entityId || actingAs;
+    const short = shortNarrationFor(div.dataset.entity);
+    div.classList.toggle("whole", !short);
+    fold.open = !short || fold.dataset.weighty === "1";
     const summary = document.createElement("summary");
     summary.textContent = "the whole of it";
     const full = document.createElement("div");
@@ -649,6 +761,9 @@ function appendPlayerEntry(who, text, cls, sara, detail, entityId) {
     div.appendChild(fold);
   }
   (currentTurn || log).appendChild(div);
+  // a telling is not taken to the foot: whoever drew it puts the screen at its start (holdAtTop, or the top of the page for a recap)
+  if (cls === "you") { lastTelling = div; return; }
+  releaseTopHold();
   // to the foot of the log and the action box, not of the page: on a phone "here with you" stacks below
   // them, and the page's own foot is that panel (Marc, 2026-09-27: "let's not do that")
   const foot = document.getElementById("player-column").getBoundingClientRect().bottom + window.scrollY;
@@ -662,6 +777,8 @@ function appendPlayerEntry(who, text, cls, sara, detail, entityId) {
 // line each.
 
 function startTurn() {
+  releaseTopHold();    // the player is acting: the screen is theirs, and the room kept under the last telling is no longer wanted
+  clearScrollRoom();
   const log = document.getElementById("player-log");
   // an answered jump question is done with once the next action starts (Marc, 2026-09-25)
   log.querySelectorAll(".entry.confirm").forEach(el => el.remove());
@@ -957,6 +1074,165 @@ async function pollWitnessed() {
     if (r.witnessed && r.witnessed.length) appendWitnessed(r.witnessed);
   } catch (e) { /* a quiet poll: the next pulse will carry them */ }
 }
+
+// -- Pictures (abhasa, Marc, 2026-11-11). A world that makes them keeps them for each player: a portrait of each character, a view of each
+// place, a picture of a heaviest moment. They are made after a telling is told and arrive on this poll: a card where they come in the log, and
+// all of them in the gallery beneath. GET /players/{pid}/pictures lists those this player may see now (Marc, 2026-11-12: their own portrait, those in
+// the scene they stand in and that place, and what was made this session from what they lived this session), so the list is asked whole each time:
+// it changes as they move, and a picture that is no longer theirs to see leaves the gallery. A world that makes none answers [].
+// The first answer after opening the page (or switching character) fills the gallery only -- the log is not flooded with old pictures.
+let picturesFor = null, picturesSeen = 0, picturesQuiet = true, picturesHere = new Map();
+function picturesOn() {
+  try { return localStorage.getItem("smritilila.pictures") !== "off"; } catch (e) { return true; }
+}
+function applyPicturesMode() {
+  const on = picturesOn();
+  document.body.classList.toggle("no-pictures", !on);
+  const btn = document.getElementById("pictures-toggle");
+  btn.setAttribute("aria-pressed", String(on));
+  btn.textContent = on ? "on" : "off";
+}
+document.getElementById("pictures-toggle").addEventListener("click", () => {
+  try { localStorage.setItem("smritilila.pictures", picturesOn() ? "off" : "on"); } catch (e) {}
+  applyPicturesMode();
+  if (picturesOn()) pollPictures();
+});
+function resetPictures(live) {
+  picturesFor = actingAs; picturesSeen = 0; picturesQuiet = !live; picturesHere = new Map();
+  document.getElementById("gallery-grid").replaceChildren();
+  document.getElementById("gallery").classList.add("hidden");
+}
+function pictureFigure(p, inGallery) {
+  const fig = document.createElement("figure");
+  fig.className = "picture" + (p.entity_id && !p.place ? " portrait" : "");
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.alt = p.caption || "a picture";
+  img.src = `/players/${encodeURIComponent(picturesFor)}/pictures/${encodeURIComponent(p.id)}`;
+  img.addEventListener("click", () => openLightbox(img.src, p.caption));
+  fig.appendChild(img);
+  if (p.caption && !p.moment) {
+    const cap = document.createElement("figcaption");
+    cap.textContent = p.caption;
+    fig.appendChild(cap);
+  }
+  return fig;
+}
+function openLightbox(src, caption) {
+  let box = document.getElementById("lightbox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "lightbox";
+    box.innerHTML = '<img alt=""><div id="lightbox-caption"></div>';
+    box.addEventListener("click", () => box.classList.add("hidden"));
+    document.body.appendChild(box);
+  }
+  box.querySelector("img").src = src;
+  box.querySelector("#lightbox-caption").textContent = caption || "";
+  box.classList.remove("hidden");
+}
+async function pollPictures() {
+  if (!actingAs || !picturesOn() || document.getElementById("play-view").classList.contains("hidden")) return;
+  if (portraitFor === actingAs && portraitLast && portraitLast.enabled === false) return;   // this world makes no pictures: nothing to ask every few seconds
+  if (picturesFor !== actingAs) resetPictures(false);
+  const asked = picturesFor;
+  let list;
+  try { list = await api(`/players/${encodeURIComponent(asked)}/pictures`); } catch (e) { return; }
+  if (asked !== actingAs || !Array.isArray(list)) return;
+  const grid = document.getElementById("gallery-grid");
+  const now = new Set(list.map(p => p.id));
+  for (const [id, fig] of picturesHere) {
+    if (!now.has(id)) { fig.remove(); picturesHere.delete(id); }   // no longer one this player may see (they left the scene, or it is another session's)
+  }
+  const before = picturesSeen;
+  for (const p of list) {
+    picturesSeen = Math.max(picturesSeen, p.seq);
+    if (picturesHere.has(p.id)) continue;
+    const fig = pictureFigure(p, true);
+    picturesHere.set(p.id, fig);
+    grid.appendChild(fig);
+    if (!picturesQuiet && p.seq > before) {   // a card in the log only for one made since the page was opened, not for one that is shown because its being came in
+      // in a turn, so it folds away with that turn's text (Marc, 2026-11-21: "When pictures are presented in earlier turns they should be collapsed along with the text when
+      // earlier turns are collapsed"): the open one, else the last, since a picture is made after its telling is told and so arrives between turns. Put straight in the
+      // log it was outside every turn, and stayed on screen when the turn it came after was folded behind "N earlier turns". Before any turn there is nothing to fold it with.
+      const turn = currentTurn || turnElements[turnElements.length - 1] || document.getElementById("player-log");
+      turn.appendChild(pictureFigure(p, false));
+    }
+  }
+  picturesQuiet = false;
+  document.getElementById("gallery").classList.toggle("hidden", picturesHere.size === 0);
+  document.getElementById("gallery-summary").textContent = `Pictures (${picturesHere.size})`;
+}
+applyPicturesMode();
+
+// A player's portrait (Marc, 2026-11-11): a draft painted from how they look, changed by asking, kept when they accept it -- final. A world that makes
+// no pictures says so, and a portrait that is kept is done: the panel is gone and the picture comes in the gallery like the rest.
+let portraitFor = null, portraitDone = false, portraitSnoozed = false, portraitRev = -1, portraitLast = null;
+function resetPortrait() {
+  portraitFor = actingAs; portraitDone = false; portraitSnoozed = false; portraitRev = -1; portraitLast = null;
+  document.getElementById("portrait-panel").classList.add("hidden");
+  document.getElementById("portrait-img").classList.add("hidden");
+  document.getElementById("portrait-asks").replaceChildren();
+}
+const portraitWords = e => String(e && e.message || e).replace(/^\d+:\s*/, "").replace(/^"|"$/g, "");
+function renderPortrait(s) {
+  portraitLast = s;
+  const panel = document.getElementById("portrait-panel");
+  if (!s.enabled || s.accepted) { portraitDone = true; panel.classList.add("hidden"); return; }
+  panel.classList.toggle("hidden", portraitSnoozed);
+  const has = s.version > 0, img = document.getElementById("portrait-img");
+  if (has) {
+    if (s.rev !== portraitRev) { img.src = `/players/${encodeURIComponent(portraitFor)}/portrait/image?rev=${s.rev}`; portraitRev = s.rev; }
+    img.classList.remove("hidden");
+  } else { img.classList.add("hidden"); portraitRev = -1; }
+  document.getElementById("portrait-status").textContent = s.busy ? "Painting..." : s.error ? s.error
+    : has ? `Version ${s.version}. Ask for changes until it is right (${s.edits_left} left), then keep it: a kept portrait is final.`
+    : "Describe how you look and a first draft is painted. You can change it by asking, until you are happy; then keep it.";
+  const asks = document.getElementById("portrait-asks");
+  asks.replaceChildren(...s.asks.map(a => { const d = document.createElement("div"); d.textContent = "You asked: " + a; return d; }));
+  document.getElementById("portrait-look-row").classList.toggle("hidden", has);
+  document.getElementById("portrait-say-row").classList.toggle("hidden", !has);
+  const look = document.getElementById("portrait-look");
+  if (!has && s.look && !look.value) look.value = s.look;
+  for (const id of ["portrait-paint", "portrait-send", "portrait-back", "portrait-accept"]) document.getElementById(id).disabled = !!s.busy;
+  document.getElementById("portrait-back").disabled = !!s.busy || s.version < 2;
+}
+async function pollPortrait() {
+  if (!actingAs || document.getElementById("play-view").classList.contains("hidden")) return;
+  if (portraitFor !== actingAs) resetPortrait();
+  if (portraitDone) return;
+  try { renderPortrait(await api(`/players/${encodeURIComponent(actingAs)}/portrait`)); } catch (e) { /* a quiet poll */ }
+}
+async function portraitDo(path, body) {
+  const ids = ["portrait-paint", "portrait-send", "portrait-back", "portrait-accept"];
+  ids.forEach(id => { document.getElementById(id).disabled = true; });
+  document.getElementById("portrait-status").textContent = "Painting...";
+  try {
+    const s = await api(`/players/${encodeURIComponent(actingAs)}/portrait/${path}`, "POST", body);
+    if (path === "edit") document.getElementById("portrait-say").value = "";
+    renderPortrait(s);
+    if (s.accepted) pollPictures();   // the kept portrait is the next picture this player is shown, and comes in as a card
+  } catch (e) {
+    document.getElementById("portrait-status").textContent = portraitWords(e);
+    if (portraitLast) renderPortrait({ ...portraitLast, error: portraitWords(e) }); else ids.forEach(id => { document.getElementById(id).disabled = false; });
+  }
+}
+document.getElementById("portrait-paint").addEventListener("click", () => portraitDo("draft", { look: document.getElementById("portrait-look").value }));
+// The grey sentence in the change box is a hint, not text, and "Change it" with nothing typed used to do nothing at all (Marc, 2026-11-11: "Change it
+// button doesn't do anything"): now it says so beside the buttons and puts the cursor in the box, and the sentence goes when they start to type.
+const portraitSay = document.getElementById("portrait-say"), portraitNudge = document.getElementById("portrait-nudge");
+portraitSay.addEventListener("input", () => portraitNudge.classList.add("hidden"));
+document.getElementById("portrait-send").addEventListener("click", () => {
+  const ask = portraitSay.value.trim();
+  if (!ask) { portraitNudge.classList.remove("hidden"); portraitSay.focus(); return; }
+  portraitNudge.classList.add("hidden");
+  portraitDo("edit", { ask });
+});
+document.getElementById("portrait-back").addEventListener("click", () => portraitDo("back"));
+document.getElementById("portrait-accept").addEventListener("click", () => {
+  if (confirm("Keep this as your portrait? It is final.")) portraitDo("accept");
+});
+document.getElementById("portrait-later").addEventListener("click", () => { portraitSnoozed = true; document.getElementById("portrait-panel").classList.add("hidden"); });
 // Who's online (Marc, 2026-09-27), and how to sync with them (Marc, 2026-10-16: "Show all online players to everyone",
 // "Remove logged off from the list"). GET /world/sync lists every player who is online, for an owner and a guest alike, with the
 // scene and the minute each stands at. Yellow: level with you -- the same scene and the same minute, the same pulse. Light violet:
@@ -1057,7 +1333,7 @@ function startWitnessedPoll() {
   if (roundPendingTimer === null) roundPendingTimer = setInterval(() => {
     if (roundSubmitted !== null || (lastRound && (lastRound.open || lastRound.running))) pollRound();
   }, ROUND_PENDING_POLL_MS);
-  if (witnessedPollTimer === null) witnessedPollTimer = setInterval(() => { pollWitnessed(); pollRound(); refreshOnline(); }, WITNESSED_POLL_MS);
+  if (witnessedPollTimer === null) witnessedPollTimer = setInterval(() => { pollWitnessed(); pollRound(); refreshOnline(); pollPictures(); pollPortrait(); }, WITNESSED_POLL_MS);
   if (heartbeatTimer === null) heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS);
   refreshOnline(true);
 }
@@ -1208,8 +1484,37 @@ async function refreshWorld() {
   return world;
 }
 
-// -- Player controls (Marc, 2026-09-24): what this character does while you
-// are offline, and log off. (The short-narration on/off was removed 2026-10-19.)
+// -- Player controls (Marc, 2026-09-24): short narration on/off, what
+// this character does while you are offline, and log off.
+
+// Short narration: a reading preference kept in this browser, PER
+// CHARACTER (Marc: the toggles apply only to the current character). Off,
+// that character's narrations show whole -- the pith, the said line and
+// the fold's toggle hide, and the fold opens (those already on screen too);
+// every other character's entries keep their own setting.
+function shortNarrationFor(entityId) {
+  // off unless this character's player turned it on (Marc, 2026-09-27: the default is off)
+  try { return localStorage.getItem("smritilila.shortNarration." + entityId) === "on"; } catch (e) { return false; }
+}
+
+function applyNarrationMode() {
+  const short = shortNarrationFor(actingAs);
+  const btn = document.getElementById("short-toggle");
+  btn.setAttribute("aria-pressed", String(short));
+  btn.textContent = short ? "on" : "off";
+  for (const entry of document.querySelectorAll("#player-log .has-fold")) {
+    const own = shortNarrationFor(entry.dataset.entity);
+    entry.classList.toggle("whole", !own);
+    const fold = entry.querySelector("details");
+    fold.open = !own || fold.dataset.weighty === "1";
+  }
+}
+
+document.getElementById("short-toggle").addEventListener("click", () => {
+  const short = !shortNarrationFor(actingAs);
+  try { localStorage.setItem("smritilila.shortNarration." + actingAs, short ? "on" : "off"); } catch (e) {}
+  applyNarrationMode();
+});
 
 // Offline -- frozen or waiting (v5 §37, POST /players/{pid}/autonomy): the
 // world's setting for this character, persisted. Frozen: out of the world
@@ -1224,6 +1529,7 @@ function renderOfflineToggle(autonomous, waiting) {
 }
 
 async function refreshPlayerControls() {
+  applyNarrationMode();
   if (!actingAs) return;
   try {
     const players = await api("/players");
@@ -1340,6 +1646,10 @@ async function showRecap(entityId) {
   }
   endTurn();
   applyTurnCollapse();
+  // opened, or switched to: the page from its top, where the last telling begins just under the bar -- not scrolled down to its end (Marc, 2026-11-22)
+  releaseTopHold();
+  clearScrollRoom();
+  window.scrollTo(0, 0);
 }
 
 // A switch clears the left column (Marc, 2026-09-24): each switch used to
@@ -1446,8 +1756,9 @@ document.getElementById("nc-cancel-btn").addEventListener("click", () => {
 
 document.getElementById("nc-arrive-btn").addEventListener("click", async () => {
   const text = document.getElementById("nc-self").value.trim();
+  const look = document.getElementById("nc-look").value.trim();
   const chosen = document.querySelector("input[name=nc-location]:checked");
-  if (!text) { alert("Say who you are first."); return; }
+  if (!text) { alert("Say who you are first (the background box)."); return; }
   if (!chosen) { alert("Choose where you arrive."); return; }
   const whereEl = document.getElementById("nc-where");
   const where = chosen.value ? "" : (whereEl ? whereEl.value.trim() : "");
@@ -1455,17 +1766,21 @@ document.getElementById("nc-arrive-btn").addEventListener("click", async () => {
   const btn = document.getElementById("nc-arrive-btn");
   btn.disabled = true; btn.textContent = "Arriving...";
   try {
-    const result = await api("/world/join", "POST", { entry_location_id: chosen.value, self_description: text, start_description: where });
+    const result = await api("/world/join", "POST", { entry_location_id: chosen.value, self_description: text, appearance: look, start_description: where });
     // You play as who you just made: the act box, the suggestions and the
     // switcher are theirs from here (actingAs is set before refreshWorld so
     // renderCharacterSwitcher keeps it).
     actingAs = result.player_entity_id;
+    resetPictures(true);   // a newcomer has no pictures yet: what is made for them arrives live, in a world that makes them
+    resetPortrait();       // and a draft of their portrait is being painted from the physical description, to be changed and kept
     suggestedNextAction = "";
     suggestedNextActionFromMemory = "";
     renderSuggestedAction();
     await refreshWorld();
     showPlayView();
     routeNarrations(result.narrations);
+    if ((result.narrations || {})[actingAs]) holdAtTop(lastTelling);   // the first telling, from its start
+    pollPortrait();
   } catch (e) {
     alert(e.message);
   } finally {
@@ -1881,11 +2196,12 @@ async function showResult(result, turn) {
   if (turn) currentTurn = turn;
   routeNarrations(result.narrations || {}, result.sara, result.sara_detail, result.witnessed);
   currentTurn = was;
-  if (turn && (result.narrations || {})[actingAs]) {
+  if ((result.narrations || {})[actingAs]) {
     // told: the turn before folds away now, and the reader is taken to the start of what they were told --
-    // one deliberate move (Safari keeps no place when content above the view is removed)
-    applyTurnCollapse();
-    turn.scrollIntoView({block: "start", behavior: "smooth"});
+    // one deliberate move (Safari keeps no place when content above the view is removed), instant and held
+    // (Marc, 2026-11-22: it was left scrolled down); a telling with no turn around it is held at its own entry
+    if (turn) applyTurnCollapse();
+    holdAtTop(turn || lastTelling);
   }
   if (Object.keys(result.narrations || {}).length) {  // a declined jump changes nothing, the offers included
     suggestedNextAction = result.suggested_next_action || "";
@@ -2025,7 +2341,8 @@ async function runAction(go) {
     pulseInFlight = false;
     input.disabled = false; suggestedBtn.disabled = false; suggestedMemoryBtn.disabled = false;
     // not on a touch screen: focusing opens the keyboard and moves the page under the reader
-    if (!window.matchMedia("(pointer: coarse)").matches) input.focus();
+    // preventScroll: focusing a box that is below the screen scrolls it into view, which took the page off the start of the telling just placed
+    if (!window.matchMedia("(pointer: coarse)").matches) input.focus({ preventScroll: true });
     if (!go) endTurn();
     setActButton();
     startWitnessedPoll();

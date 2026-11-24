@@ -142,6 +142,22 @@ def write(client, view: str, what: str, why: str = "", anchor: str = "") -> dict
     return out if isinstance(out, dict) else {}
 
 
+def give_births(client, spec: dict, place_label, bhuvana: str | None = None, darsana: str | None = None, source: str | None = None) -> dict:
+    """Marc, 2026-11-06: every first memory is preceded by a birth memory. Each person of a written seed gets one (bija.write_births), kept
+    in the proposal as `birth` beside their first tuples -- so the god who reviews the proposal reads it, and what is planted is what was
+    read. `place_label(x)`: the name of what a person's `in` points at, a seed place's key or a place the world holds. A call that fails
+    leaves that person without; nothing here fails the proposal."""
+    from smritilila.smrti.bija import birth_asks, write_births
+    people = {str(r["key"]): {"label": f"{r['name']}, {r['label']}" if r.get("name") else r["label"], "place": str(r.get("in") or ""),
+                              "tuples": r.get("tuples") or []}
+              for r in spec.get("people") or [] if r.get("key") and r.get("label")}
+    births = write_births(client, birth_asks(people, place_label), bhuvana, darsana, source)
+    for r in spec.get("people") or []:
+        if births.get(str(r.get("key"))):
+            r["birth"] = births[str(r["key"])]
+    return spec
+
+
 def check(spec: dict, kosha, players: set[str], t: int) -> tuple[list[str], list[str]]:
     """Deterministic: (errors, warnings). An error means the seed is never planted as it stands."""
     errors, warnings = [], []
@@ -249,7 +265,10 @@ def plant(spec: dict, now: int, minute: int | None, pulse_id: str, embed) -> tup
     for r in spec.get("people") or []:
         tuples = [{"text": str(x["text"]).strip(), "weight": x.get("weight"), "use": x.get("use")}
                   for x in r.get("tuples") or [] if isinstance(x, dict) and str(x.get("text") or "").strip()]
-        person, pm, placed = plant_person(r["label"], tuples, idof(str(r["in"])), now, pulse_id, embed, eid=ids[r["key"]], minute=minute)
+        birth = [{"text": str(b["text"]).strip(), "weight": b.get("weight"), "use": b.get("use")}
+                 for b in r.get("birth") or [] if isinstance(b, dict) and str(b.get("text") or "").strip()]  # bija.write_births, kept in the proposal for review
+        person, pm, placed = plant_person(r["label"], tuples, idof(str(r["in"])), now, pulse_id, embed, eid=ids[r["key"]], minute=minute,
+                                          birth=birth or None)
         ents.append(person)
         mems += pm
         recs += [placed, Record(new_id(), "name", person.id, str(r.get("name") or r["label"]).strip(), now, pulse_id)]
@@ -283,7 +302,9 @@ def summary(spec: dict) -> list[str]:
     for r in spec.get("places") or []:
         out.append(f"  place  {r.get('label')}{' (' + r['name'] + ')' if r.get('name') else ''} -- {'scene' if r.get('scene') else 'region'} in {r.get('in')}")
     for r in spec.get("people") or []:
-        out.append(f"  person {r.get('name')}, {r.get('label')} -- in {r.get('in')}; {len(r.get('tuples') or [])} first memories")
+        born = len([b for b in r.get("birth") or [] if isinstance(b, dict)])
+        out.append(f"  person {r.get('name')}, {r.get('label')} -- in {r.get('in')}; {len(r.get('tuples') or [])} first memories"
+                   f"{f', and a birth memory of {born}' if born else ''}")
     for r in spec.get("things") or []:
         pages = len(r.get("pages") or [])
         out.append(f"  thing  {r.get('label')} -- in {r.get('in')}{f'; {pages} pages' if pages else ''}")
@@ -307,7 +328,7 @@ def probe(canon, memories: list[Memory], records: list[Record], ents: list[Entit
     place under a place the world already holds; reads -- each written thing read whole by name by its holder, and
     silent when not. Cost: one retrieval a player, two a written thing."""
     from smritilila.smrti import narrator as N
-    from smritilila.smrti.pulse import _context_for
+    from smritilila.smrti.pulse import context_for
     from smritilila.smrti.samskara import Samskara
     work = canon.fork()
     for e in ents:
@@ -318,7 +339,7 @@ def probe(canon, memories: list[Memory], records: list[Record], ents: list[Entit
 
     def prompt(actor: str, action: str) -> str:
         log = sk.log_for(work)
-        ctx = _context_for(work, log, actor, action, now, None, keep=frozenset({actor}))
+        ctx = context_for(work, log, actor, action, now, None, keep=frozenset({actor}))
         return N.render(ctx, action, set(log.places), N.handle_map(ctx, {i: e.labels for i, e in work.entities.items()}))
 
     out: dict = {"leaks": {}, "stands": [], "reads": {}}

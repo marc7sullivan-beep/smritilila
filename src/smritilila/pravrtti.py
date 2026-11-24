@@ -8,7 +8,7 @@ last turn gave nothing is dormant until touched; a scene near a player that has 
 came, only if someone could have; a waiting player takes no turn until touched; what never kept a memory is folded
 into what holds it (laya); a round open in a scene, or a player away in it, holds the scene's turns; and in a world
 that keeps a clock, NPCs follow and never lead (the kāla gate). scheduler/episode.py then picks the oldest of what
-is left, and routes/spanda.py runs its turn.
+is left, and spanda.py runs its turn.
 
 Moved out of main.py unchanged (2026-10-05, Marc: "let's go get that main.py in shape"); main re-exported every
 name until c3e89a4; it no longer does, so a caller names this module. Each function takes the live WorldSession.
@@ -18,10 +18,10 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from smritilila.itihasa import _age_clock, _chronicle_id
+from smritilila.itihasa import age_clock, chronicle_id
 from smritilila.memory.memory import Memory
 from smritilila.sakshi import log_event
-from smritilila.sangama import _reach_key
+from smritilila.sangama import reach_key
 from smritilila.smrti.context import NOWHERE
 from smritilila.smrti.kala import chronicle_ids, world_turn
 
@@ -49,7 +49,7 @@ def _age_ahead(world: WorldSession) -> int | None:
     here = [p for p in world.playable_entity_ids if p not in world.absent()]
     if kala is None or not here:
         return None
-    return (_age_clock(world) or kala.start) - max(kala.now(p) for p in here)
+    return (age_clock(world) or kala.start) - max(kala.now(p) for p in here)
 
 
 def _age_held(world: WorldSession) -> bool:
@@ -59,7 +59,7 @@ def _age_held(world: WorldSession) -> bool:
     return ahead is not None and ahead > int(world.pace()["age_lead"])
 
 
-def _smrti_exploration_pool(world: WorldSession, redraw: bool = False) -> list[str]:
+def smrti_exploration_pool(world: WorldSession, redraw: bool = False) -> list[str]:
     """v4 (v5 §10-§12, §38): every perceiver who is not a player whose time is their own, drawn by scene.
     Its name: pravṛtti (प्रवृत्ति), activity, the world's own unfolding (v5 §38).
     Where anyone is, is their containment (smrti/kosha.py); near is a
@@ -89,7 +89,7 @@ def _smrti_exploration_pool(world: WorldSession, redraw: bool = False) -> list[s
     kosha = world.kosha()
     players = set(world.playable_entity_ids)
     drawn_players = players - set(world.unvoiced())  # v5 §37: offline, and allowing the world to act for them
-    chronicle = _chronicle_id(world)
+    chronicle = chronicle_id(world)
 
     def where(loc: str | None) -> str:
         if not loc or loc == NOWHERE:
@@ -306,7 +306,7 @@ def _smrti_exploration_pool(world: WorldSession, redraw: bool = False) -> list[s
     return pool + arrivals
 
 
-def _log_pool(world: WorldSession, pool: list[str]) -> None:
+def log_pool(world: WorldSession, pool: list[str]) -> None:
     """The draw's candidates as the world saw them, witnessed (Marc, 2026-09-28): each with its last turn's tick and
     the uses of its own tuples at that tick -- what its last turn gave. The pool hangs on state never written (the
     scene cadence, presence, rounds, the clock's caps), so history could not be replayed faithfully (22 of 86 picks
@@ -341,7 +341,7 @@ def _paused(world: WorldSession) -> frozenset[str]:
     return frozenset(s for s in (world.here(p, absent=False)[0] for p in away) if s)
 
 
-def _hold_for_rounds(world: WorldSession, pool: list[str]) -> list[str]:
+def hold_for_rounds(world: WorldSession, pool: list[str]) -> list[str]:
     """Saṅgama: a scene with a round open takes no turn of the world's own
     until the round is written -- the clock does not move under its players.
     Cost: the open rounds, one scene lookup per candidate."""
@@ -349,7 +349,7 @@ def _hold_for_rounds(world: WorldSession, pool: list[str]) -> list[str]:
         return pool
     k = world.kosha()
     t = world.canon.world_time + 1
-    held = [e for e in pool if _reach_key(k, e if k.is_scene(e) else k.scene_of(e, t), t) in world.rounds]  # v4.31: rounds are keyed by reach
+    held = [e for e in pool if reach_key(k, e if k.is_scene(e) else k.scene_of(e, t), t) in world.rounds]  # v4.31: rounds are keyed by reach
     if held:
         log_event("sangama.world_waits", tick=world.canon.world_time, scenes=sorted(world.rounds), held=held)
     return [e for e in pool if e not in held]
@@ -358,7 +358,7 @@ def _hold_for_rounds(world: WorldSession, pool: list[str]) -> list[str]:
 ABSORBED_QUIET_TICKS = 40  # absorption: quiet is nothing of one's own -- tuple, move, mention -- in this many of the world's ticks
 
 
-def _fold_absorbed(world: WorldSession, pool: list[str]) -> list[str]:
+def fold_absorbed(world: WorldSession, pool: list[str]) -> list[str]:
     """Absorption (b) in the draw (Marc, 2026-09-29): a candidate is folded into its container -- not drawn on its own;
     its container's turn carries it -- when it is QUIET (no tuple of its own that is weighty (`_weighty`; the room's
     habitual copy a player's pulse writes it does not count), no move, no mention in the last ABSORBED_QUIET_TICKS ticks) and has
@@ -394,7 +394,7 @@ def _fold_absorbed(world: WorldSession, pool: list[str]) -> list[str]:
     return [e for e in pool if e not in folded]
 
 
-def _hold_for_away(world: WorldSession, pool: list[str]) -> list[str]:
+def hold_for_away(world: WorldSession, pool: list[str]) -> list[str]:
     """The draw without what stands in a paused scene (_paused)."""
     paused = _paused(world)
     if not paused or not pool:
@@ -407,7 +407,7 @@ def _hold_for_away(world: WorldSession, pool: list[str]) -> list[str]:
     return [e for e in pool if e not in held]
 
 
-def _kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[str, tuple[int, int]]]:
+def kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[str, tuple[int, int]]]:
     """v5 §23: NPCs follow and never lead. In a world that keeps a clock, a
     candidate at or past its reference -- the EARLIEST clock among the
     players whose time is their own (online, or offline and not allowing
@@ -442,7 +442,7 @@ def _kala_gate(world: WorldSession, pool: list[str]) -> tuple[list[str], dict[st
     their_own = [p for p in here if p in online or p not in world.autonomous]
     where = {p: k.scene_of(p, t) for p in their_own}
     gated = []
-    chronicle, age_draw = _chronicle_id(world), False
+    chronicle, age_draw = chronicle_id(world), False
     for eid in pool:
         if eid == chronicle:
             # the age runs ahead of the players, a season at most (Marc, 2026-09-25); its own grain, no cap

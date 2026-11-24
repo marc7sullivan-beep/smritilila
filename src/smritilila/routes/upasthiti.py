@@ -16,10 +16,10 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from smritilila import adhisthana  # the services, called through it so a test's patch there reaches them
 from smritilila import dvara  # the gate, called through it for the same reason
 from smritilila import users_registry
-from smritilila.adhisthana import WorldSession, _store
+from smritilila.adhisthana import WorldSession, store_of
 from smritilila.sakshi import log_event
-from smritilila.schemas import AutonomyRequest, MeOut, MelanaOut, PlayerOut, PresenceRequest, RetireRequest, _labelled
-from smritilila.dvara import _require_own, _require_player
+from smritilila.schemas import AutonomyRequest, MeOut, MelanaOut, PlayerOut, PresenceRequest, RetireRequest, labelled
+from smritilila.dvara import require_own, require_player
 
 
 router = APIRouter()
@@ -34,8 +34,8 @@ def _player_out(world: WorldSession, pid: str) -> PlayerOut:
 @router.get("/players", response_model=list[PlayerOut])
 async def list_players(request: Request = None) -> list[PlayerOut]:
     world = await adhisthana.get_world()
-    guest = dvara._guest(request) if request is not None else None
-    return [_player_out(world, pid) for pid in world.playable_entity_ids if guest is None or dvara._plays(world, guest, pid)]
+    guest = dvara.guest_of(request) if request is not None else None
+    return [_player_out(world, pid) for pid in world.playable_entity_ids if guest is None or dvara.plays(world, guest, pid)]
 
 
 @router.get("/world/sync", response_model=list[MelanaOut])
@@ -48,8 +48,8 @@ async def melana(as_: str | None = Query(None, alias="as"), own: bool = Query(Fa
     their page is closed -- offline, not yet logged off, not waiting (v5 §37: the world stops at their present) -- with `online` false. Cost: one pass over
     the players."""
     world = await adhisthana.get_world()
-    guest = dvara._guest(request) if request is not None else None
-    mine = as_ if as_ in world.playable_entity_ids and (guest is None or dvara._plays(world, guest, as_)) else None
+    guest = dvara.guest_of(request) if request is not None else None
+    mine = as_ if as_ in world.playable_entity_ids and (guest is None or dvara.plays(world, guest, as_)) else None
     sk = world.samskara()
     kosha = sk.kosha_for(world.canon, ())
     t = (sk.mem.max_tick if sk.mem.max_tick >= 0 else world.canon.world_time) + 1
@@ -140,7 +140,7 @@ async def make_playable(eid: str) -> PlayerOut:
         world.waiting.add(eid)
         world.canon.entities[eid].last_simulated_tick = world.canon.world_time  # quiet from now: a touch wakes them
         world.logged_off.add(eid)
-        store = _store(world)
+        store = store_of(world)
         await store.commit(world.canon, [], [], touched_ids=[eid])
         await store.save_waiting(sorted(world.waiting))
         await store.save_session_config(world.scene_owner_entity_id, world.entry_point_location_ids,
@@ -161,10 +161,10 @@ async def set_autonomy(pid: str, req: AutonomyRequest) -> PlayerOut:
     "remove autonomous for human players and only allow frozen or waiting");
     `wait` is kept for old pages and means nothing more. Persisted."""
     world = await adhisthana.get_world()
-    _require_player(world, pid)
+    require_player(world, pid)
     was_absent = pid in world.absent()
     (world.autonomous.add if req.allow else world.autonomous.discard)(pid)
-    store = _store(world)
+    store = store_of(world)
     if req.allow:
         if pid not in world.waiting:
             world.waiting.add(pid)
@@ -191,7 +191,7 @@ async def set_presence(pid: str, req: PresenceRequest) -> PlayerOut:
     their own until touched, v4.58). Back online, their next pulse narrates
     their return."""
     world = await adhisthana.get_world()
-    _require_player(world, pid)
+    require_player(world, pid)
     world.presence[pid] = "online" if req.online else "offline"
     if req.online:
         world.last_seen[pid] = time.monotonic()
@@ -200,7 +200,7 @@ async def set_presence(pid: str, req: PresenceRequest) -> PlayerOut:
         world.logged_off.add(pid)  # Marc, 2026-09-24: logged off, and frozen, is out of the world
         back = True
     if back:
-        await _store(world).save_logged_off(sorted(world.logged_off))
+        await store_of(world).save_logged_off(sorted(world.logged_off))
     log_event("player.presence", entity_id=pid, online=req.online, absent=pid in world.absent())
     return _player_out(world, pid)
 
@@ -216,9 +216,9 @@ async def heartbeat(pid: str, request: Request = None) -> None:
     as before. It only keeps a player online; it never brings back one logged off -- a deliberate log-off holds until
     they act or come back online."""
     world = await adhisthana.get_world()
-    _require_player(world, pid)
+    require_player(world, pid)
     if request is not None:
-        _require_own(request, world, pid)
+        require_own(request, world, pid)
     if pid in world.logged_off:
         log_event("player.heartbeat_ignored", entity_id=pid, why="logged_off")
         return
@@ -241,8 +241,8 @@ async def retire_player(pid: str, req: RetireRequest, request: Request = None) -
     or a telling held for consent. The world's own record is untouched: no
     memory, tuple or containment is written. Cost: the player sets, once."""
     world = await adhisthana.get_world()
-    _require_player(world, pid)
-    name = _labelled(world.canon, pid)
+    require_player(world, pid)
+    name = labelled(world.canon, pid)
     if req.confirm.strip().lower() != name.strip().lower():
         raise HTTPException(422, f"type the character's name, {name!r}, to retire them")
     if pid in world.held or any(pid in (r.get("actions") or {}) for r in world.rounds.values()):
@@ -258,22 +258,22 @@ async def retire_player(pid: str, req: RetireRequest, request: Request = None) -
     world.playable_entity_ids = [p for p in world.playable_entity_ids if p != pid]
     if world.scene_owner_entity_id == pid:  # "" is a world nobody plays yet, never re-crowned on load
         world.scene_owner_entity_id = world.playable_entity_ids[0] if world.playable_entity_ids else ""
-    store = _store(world)
+    store = store_of(world)
     await store.save_logged_off(sorted(world.logged_off))
     await store.save_autonomy(sorted(world.autonomous))
     await store.save_waiting(sorted(world.waiting))
     await store.save_played_by(world.played_by)
     await store.save_session_config(world.scene_owner_entity_id, world.entry_point_location_ids,
                                     world.playable_entity_ids, world.setting_description)
-    guest = dvara._guest(request) if request is not None else None
-    if guest is not None and not dvara._god_of_active(guest):
+    guest = dvara.guest_of(request) if request is not None else None
+    if guest is not None and not dvara.god_of_active(guest):
         # a guest's retirement is held back until a god reviews it (Marc, 2026-10-02): out of the world till then
         world.held_back.add(pid)
         await store.save_held_back(sorted(world.held_back))
         # Marc, 2026-10-02: "make sure to alert me if a guest retires a character!" -- one push, as a guest online does
-        entry = adhisthana._active_world_registry_entry()
+        entry = adhisthana.active_world_registry_entry()
         wname = entry.name if entry is not None else "Smritilila"
-        dvara._schedule_alert(f"{guest} retired {name} on {wname}", f"{name} is held back until you review it (GET /world/held).",
+        dvara.schedule_alert(f"{guest} retired {name} on {wname}", f"{name} is held back until you review it (GET /world/held).",
                         getattr(entry, "url", None))
     world._samskara = None  # the players are part of its reading
     log_event("player.retired", entity_id=pid, label=name, world_time=world.canon.world_time, held_back=pid in world.held_back)
@@ -282,5 +282,5 @@ async def retire_player(pid: str, req: RetireRequest, request: Request = None) -
 @router.get("/me", response_model=MeOut)
 async def who_am_i(request: Request) -> MeOut:
     """Who the page is for: an owner, or a guest -- the admin link and the new-world button are the owner's (and a builder's), and a guest's intro is shown once."""
-    guest = dvara._guest(request)
+    guest = dvara.guest_of(request)
     return MeOut(owner=guest is None, builder=guest is None or users_registry.may_build(guest))

@@ -54,9 +54,25 @@ class EntryPointOut(BaseModel):
 
 class JoinRequest(BaseModel):
     entry_location_id: str = ""
-    self_description: str
+    self_description: str   # the background: who they are, what they do, what brings them here (the page's second box)
     # or, in the player's own words, where they start (Marc, 2026-10-01): a listed scene if it is one, else a new one
     start_description: str = ""
+    # the physical description -- appearance and clothing (Marc, 2026-11-11: "two boxes"), the page's first box: given to every writer of the
+    # newcomer beside the background, and what their portrait is made from. Optional: a newcomer with none is pictured from what is written of them.
+    appearance: str = ""
+
+    def told(self) -> str:
+        """The newcomer as the writers are given them: the background, then how they look."""
+        look = self.appearance.strip()
+        return self.self_description.strip() + (("\n\nPHYSICAL DESCRIPTION (appearance, clothing): " + look) if look else "")
+
+
+class PortraitDraftRequest(BaseModel):
+    look: str   # how the player looks: face, hair, build, clothing (ābhāsa, 2026-11-11)
+
+
+class PortraitEditRequest(BaseModel):
+    ask: str    # what to change in the portrait shown, in the player's own words
 
 
 class JoinResponse(BaseModel):
@@ -109,7 +125,7 @@ class PulseResponse(BaseModel):
     round: dict[str, Any] | None = None
 
 
-def _told_nothing(**fields) -> PulseResponse:
+def told_nothing(**fields) -> PulseResponse:
     """An answer that tells nothing yet: a question held for consent, an action waiting in its round, a jump declined."""
     return PulseResponse(narrations={}, promoted_entity_ids=[], suggested_next_action="", suggested_next_action_from_memory="",
                          **fields)
@@ -386,7 +402,7 @@ class ProposalOut(BaseModel):
     report: dict = {}         # what a map's reading left out and why (smrti/manacitra.py); empty for any other proposal
 
 
-def _labelled(canon, eid: str) -> str:
+def labelled(canon, eid: str) -> str:
     """An entity's first label, as an answer shows it (its id if it has none)."""
     e = canon.entities.get(eid)
     return e.labels[0] if e and e.labels else eid

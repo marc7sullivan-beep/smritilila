@@ -49,7 +49,7 @@ def test_memory_round_trips_with_a_real_embedding() -> None:
 async def test_entities_are_upserted_in_id_order_whatever_order_they_arrive_in() -> None:
     """The deadlock of 2026-09-22. ON CONFLICT DO UPDATE takes an
     exclusive row lock, and two pulses commit concurrently by design --
-    the player's and the deferred activation's (routes/spanda.py's background
+    the player's and the deferred activation's (spanda.py's background
     task). The order came from `set(touched_ids)` in world_store.commit,
     and a set iterates by hash modulo its table size, so two DIFFERENT
     sets sharing two entities routinely order them oppositely: 12 of 12

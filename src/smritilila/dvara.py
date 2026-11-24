@@ -4,12 +4,12 @@
 owners, a guest's identity and the worlds open to guests, which paths
 each may take, whether a guest plays the character a request names, the
 alert sent when a guest comes back, and the two checks a route makes
-inside itself (_require_own, _require_player). The middleware that
+inside itself (require_own, require_player). The middleware that
 stands at the door, guest_gate, stays with the app in main.py and reads
 its tables here.
 
 Moved whole from main.py, nothing inside changed. Names a test patches
-(_guest, _plays, _god_of_active, _guest_seen, _schedule_alert) are
+(guest_of, plays, god_of_active, _guest_seen, schedule_alert) are
 called from other modules as dvara.X, never imported bare: one binding,
 so a test's patch here reaches every caller."""
 
@@ -28,7 +28,7 @@ from smritilila.adhisthana import PLAYER_IDLE_SECONDS, WorldSession
 from smritilila.sakshi import log_event
 
 
-def _open_to_guests(entry, guest: str | None = None) -> bool:
+def open_to_guests(entry, guest: str | None = None) -> bool:
     """Open to every guest, or -- a world naming its guests -- to this one."""
     guests = getattr(entry, "guests", False)
     if entry.name in GUEST_WORLDS or guests is True:
@@ -85,7 +85,7 @@ def _host_allowed(host: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in ALLOWED_DOMAINS)
 
 
-def _host_refusal(request: Request) -> JSONResponse | None:
+def host_refusal(request: Request) -> JSONResponse | None:
     """None to let the request on; a 400 to stop it at the door (guest_gate calls this before anything else)."""
     if HOST_GUARD == "off":
         return None
@@ -124,14 +124,14 @@ INVITER = os.environ.get("SMRITILILA_INVITER", "owner@example.com").strip().lowe
 
 # what a world's own gods may do in it, beside Marc and Anu: most of what an owner does to that world (not /worlds/*,
 # /admin*, /builder/*, or GET /world/npcs and /world/cast: owner only)
-_WORLD_GODS_MAY = {("POST", "/world/clear"), ("GET", "/world/view"), ("PUT", "/world/view"), ("POST", "/world/bhuvana"), ("POST", "/world/describe"),
+WORLD_GODS_MAY = {("POST", "/world/clear"), ("GET", "/world/view"), ("PUT", "/world/view"), ("POST", "/world/bhuvana"), ("POST", "/world/describe"),
                    ("POST", "/world/expand"), ("POST", "/genesis")}
 
 
-_WORLD_GODS_MAY_PREFIX = ("/world/playable/", "/world/becoming/", "/world/containment/", "/world/pratistha", "/world/manacitra", "/world/held")
+WORLD_GODS_MAY_PREFIX = ("/world/playable/", "/world/becoming/", "/world/containment/", "/world/pratistha", "/world/manacitra", "/world/held")
 
 
-_DECIDED_INSIDE = {("POST", "/worlds/create"), ("POST", "/worlds/invite")}  # the endpoint itself asks who is asking
+DECIDED_INSIDE = {("POST", "/worlds/create"), ("POST", "/worlds/invite")}  # the endpoint itself asks who is asking
 
 # Marc, 2026-10-05: "Block guests from world creation". An invited guest could make a world of their own, on a server of its own
 # (2026-09-30); no guest may now, invited or not. The invited-author path in /worlds/create stays, behind this one switch,
@@ -142,22 +142,22 @@ GUESTS_MAY_CREATE_WORLDS = False
 GUEST_WORLDS = frozenset(w.strip() for w in os.environ.get("SMRITILILA_GUEST_WORLDS", "Stonemarch").split(",") if w.strip())
 
 
-# what only an owner may do: (method, path); and by path prefix, _OWNER_ONLY_PREFIX below
-_OWNER_ONLY = {("POST", "/world/clear"), ("GET", "/world/view"), ("PUT", "/world/view"), ("POST", "/world/bhuvana"), ("POST", "/world/describe"),
+# what only an owner may do: (method, path); and by path prefix, OWNER_ONLY_PREFIX below
+OWNER_ONLY = {("POST", "/world/clear"), ("GET", "/world/view"), ("PUT", "/world/view"), ("POST", "/world/bhuvana"), ("POST", "/world/describe"),
                ("POST", "/world/expand"), ("POST", "/genesis"), ("POST", "/worlds/create"), ("POST", "/worlds/select"), ("GET", "/admin"), ("GET", "/world/npcs"), ("GET", "/world/cast")}
 
 
-_OWNER_ONLY_PREFIX = ("/worlds/", "/world/playable/", "/world/becoming/", "/world/containment/", "/world/pratistha", "/world/manacitra", "/world/held",
+OWNER_ONLY_PREFIX = ("/worlds/", "/world/playable/", "/world/becoming/", "/world/containment/", "/world/pratistha", "/world/manacitra", "/world/held",
                       "/builder/", "/admin/")  # the admin screen's routes (2026-10-06); /worlds/{name}/backup; a being made playable; the builder (2026-10-06): an owner makes worlds, every route of it
 
 
-_OPEN_TO_ANY = {"/", "/health", "/worlds", "/favicon.ico", "/me"}  # never world-scoped; /worlds lists only guest worlds to a guest
+OPEN_TO_ANY = {"/", "/health", "/worlds", "/favicon.ico", "/me"}  # never world-scoped; /worlds lists only guest worlds to a guest
 
 
-_PLAYER_PATH = re.compile(r"^/(?:players|rounds|entities)/([^/]+)")
+PLAYER_PATH = re.compile(r"^/(?:players|rounds|entities)/([^/]+)")
 
 
-def _guest(request: Request) -> str | None:
+def guest_of(request: Request) -> str | None:
     """The visitor's email if they are a guest; None for an owner. "" for a
     visitor who came through Cloudflare unnamed (a guest who owns nothing)."""
     email = request.headers.get("cf-access-authenticated-user-email")
@@ -166,17 +166,17 @@ def _guest(request: Request) -> str | None:
     return None if email.strip().lower() in OWNERS else email.strip().lower()
 
 
-def _plays(world: "WorldSession", guest: str, pid: str) -> bool:
+def plays(world: "WorldSession", guest: str, pid: str) -> bool:
     return bool(guest) and world.played_by.get(pid) == guest
 
 
-def _god_of_active(guest: str | None) -> bool:
+def god_of_active(guest: str | None) -> bool:
     """A named visitor who is one of the active world's own gods (its authors)."""
-    entry = adhisthana._active_world_registry_entry() if guest else None
+    entry = adhisthana.active_world_registry_entry() if guest else None
     return entry is not None and guest in entry.gods
 
 
-def _refuse(detail: str) -> JSONResponse:
+def refuse(detail: str) -> JSONResponse:
     return JSONResponse(status_code=403, content={"detail": detail})
 
 
@@ -194,7 +194,7 @@ _guest_seen: dict[str, float] = {}
 _alerts_in_flight: set = set()
 
 
-def _guest_online(guest: str) -> bool:
+def guest_online(guest: str) -> bool:
     """True on a guest's first request, or their first after being away."""
     now = time.monotonic()
     last = _guest_seen.get(guest)
@@ -217,20 +217,20 @@ async def _alert(title: str, message: str, click: str | None = None) -> None:
         log_event("alert.failed", title=title, error=str(exc)[:200])
 
 
-def _schedule_alert(title: str, message: str, click: str | None = None) -> None:
+def schedule_alert(title: str, message: str, click: str | None = None) -> None:
     task = asyncio.get_running_loop().create_task(_alert(title, message, click))
     _alerts_in_flight.add(task)  # held until done: a bare task may be collected mid-flight
     task.add_done_callback(_alerts_in_flight.discard)
 
 
-def _require_own(request: Request, world: "WorldSession", pid: str | None) -> None:
+def require_own(request: Request, world: "WorldSession", pid: str | None) -> None:
     """A guest acts only as their own character (the bodies of /pulses and /pulses/confirm)."""
-    guest = _guest(request) if request is not None else None  # called in-process: this machine
-    if guest is not None and not _plays(world, guest, pid or "") and not _god_of_active(guest):
+    guest = guest_of(request) if request is not None else None  # called in-process: this machine
+    if guest is not None and not plays(world, guest, pid or "") and not god_of_active(guest):
         log_event("guest.refused", guest=guest, path=request.url.path, reason="not_their_character", entity_id=pid)
         raise HTTPException(403, "that character is not yours")
 
 
-def _require_player(world: WorldSession, pid: str) -> None:
+def require_player(world: WorldSession, pid: str) -> None:
     if pid not in world.playable_entity_ids:
         raise HTTPException(404, f"{pid} is not a player")

@@ -6,7 +6,7 @@ guest setting of each, changed here and kept in worlds.json, which every server 
 registered users (users.json: who may use the world builder) and the bots (bots.json: which characters an agent plays when a person
 is active in their world; scripts/bots_supervisor.py carries them out).
 
-Owner-only, wholly: the gate refuses a guest every /admin route (dvara._OWNER_ONLY_PREFIX). It reads and writes the registry, and asks
+Owner-only, wholly: the gate refuses a guest every /admin route (dvara.OWNER_ONLY_PREFIX). It reads and writes the registry, and asks
 a world's own server what it holds; it touches a world only to make an NPC playable when it is switched on as a bot (PUT /admin/bots),
 and nothing here writes a world's memory. Starting, stopping and restarting servers stay by hand."""
 
@@ -76,7 +76,7 @@ def _look(port: int | None) -> dict:
 
 def _owner_only(request: Request) -> None:
     """The gate already refuses a guest; this is the endpoint's own word, so it holds if the gate's list is ever edited."""
-    guest = dvara._guest(request)
+    guest = dvara.guest_of(request)
     if guest is not None:
         log_event("guest.refused", guest=guest, method=request.method, path=request.url.path, reason="admin")
         raise HTTPException(403, "only the owner oversees the worlds")
@@ -199,8 +199,8 @@ def _judge_important(world: str, setting: str, beings: list[dict]) -> dict[str, 
 
 def _alive_client():
     """The model that reads: the builder's (the best, low volume, owner only). Tests replace this."""
-    from smritilila.routes.sthapati import _builder_client
-    return _builder_client()
+    from smritilila.routes.sthapati import builder_client
+    return builder_client()
 
 
 def _judge_alive(world: str, npcs: list[dict]) -> dict[str, bool]:

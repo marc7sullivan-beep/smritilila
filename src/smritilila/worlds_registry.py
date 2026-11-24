@@ -67,6 +67,9 @@ class WorldRegistryEntry:
     # is narrated by the mid-size model alone -- Flash handed out a breakthrough its own pulse four earlier had ruled out):
     # the share of calls the secondary takes on this world's server, over SMRITILILA_ROTATE_SHARE. None: the server's.
     rotate_share: float | None = None
+    # Pictures (ābhāsa, Marc, 2026-11-11): None, off; else this world's settings -- {"daily": pictures a day, "style": its look, "moment_weight":
+    # the heaviest-weight cut} -- {} for the defaults (abhasa.py). In worlds.json: "pictures": true, or the object.
+    pictures: dict | None = None
 
 
 def load_worlds_registry(path: str | Path | None = None) -> list[WorldRegistryEntry]:
@@ -82,7 +85,7 @@ def load_worlds_registry(path: str | Path | None = None) -> list[WorldRegistryEn
         WorldRegistryEntry(name=w["name"], database_url=w["database_url"],
                            gods=tuple(g.strip().lower() for g in w.get("gods", []) if g.strip()), port=w.get("port"),
                            description=w.get("description"), described_at=w.get("description_at"), url=w.get("url"), guests=_guests(w.get("guests")),
-                           rotate_share=_share(w.get("rotate_share")))
+                           rotate_share=_share(w.get("rotate_share")), pictures=_pictures(w.get("pictures")))
         for w in data.get("worlds", [])
     ]
 
@@ -102,6 +105,13 @@ def _share(value) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return float(value) if 0.0 <= value <= 1.0 else None
+
+
+def _pictures(value) -> dict | None:
+    """A world's picture settings: true is the defaults, an object is its own, anything else is off -- a typo never turns a world's spending on."""
+    if value is True:
+        return {}
+    return dict(value) if isinstance(value, dict) else None
 
 
 def _guests(value) -> bool | tuple[str, ...]:

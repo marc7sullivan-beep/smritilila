@@ -259,7 +259,7 @@ def _configure() -> None:
     Measured: eight threads released together lost seven of their nine
     lines, every attempt. Inherited from the original Phase 0
     instrumentation (7aec707) and never triggered on purpose, but
-    the routes (routes/bija.py, routes/spanda.py) run several things through asyncio.to_thread -- genesis,
+    the routes and their services (routes/bija.py, udbhava.py, spanda.py) run several things through asyncio.to_thread -- genesis,
     bhuvana, expand, the deferred activation pulse -- and all of them
     log, so the window is real and it sits exactly at process start,
     where the run line and the first world are written."""

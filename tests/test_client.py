@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from smritilila.llm.client import RotatingClient, _pulse_id_ctx, _usage_fields, bind_pulse_id
+from smritilila.llm.client import RotatingClient, pulse_id_ctx, usage_fields, bind_pulse_id
 
 
 class _FakeClient:
@@ -91,7 +91,7 @@ def test_secondary_failing_does_not_fall_back_to_primary_again() -> None:
 
 def test_bind_pulse_id_propagates_into_an_asyncio_to_thread_call() -> None:
     # The whole design rests on this: _run_one_activation
-    # (routes/spanda.py) dispatches run_smrti_pulse via asyncio.to_thread, and
+    # (spanda.py) dispatches run_smrti_pulse via asyncio.to_thread, and
     # contextvars.copy_context() propagation is what lets bind_pulse_id's
     # value survive the hop onto that worker thread with no plumbing.
     import asyncio
@@ -99,7 +99,7 @@ def test_bind_pulse_id_propagates_into_an_asyncio_to_thread_call() -> None:
     seen: list[str | None] = []
 
     def _read_pulse_id_from_ctx_var() -> None:
-        seen.append(_pulse_id_ctx.get())
+        seen.append(pulse_id_ctx.get())
 
     async def _run() -> None:
         bind_pulse_id("p_thread")
@@ -111,8 +111,8 @@ def test_bind_pulse_id_propagates_into_an_asyncio_to_thread_call() -> None:
 
 
 def test_usage_fields_returns_empty_for_a_none_response() -> None:
-    assert _usage_fields(None, "the first provider") == {}
-    assert _usage_fields(None, "the second model") == {}
+    assert usage_fields(None, "the first provider") == {}
+    assert usage_fields(None, "the second model") == {}
 
 
 def test_usage_fields_swallows_an_unexpected_response_shape() -> None:
@@ -123,8 +123,8 @@ def test_usage_fields_swallows_an_unexpected_response_shape() -> None:
     class _BareResponse:
         pass
 
-    assert _usage_fields(_BareResponse(), "the first provider") == {}
-    assert _usage_fields(_BareResponse(), "the second model") == {}
+    assert usage_fields(_BareResponse(), "the first provider") == {}
+    assert usage_fields(_BareResponse(), "the second model") == {}
 
 
 def test_rotation_sends_exactly_the_configured_share_to_the_secondary() -> None:
@@ -214,7 +214,7 @@ def test_a_model_that_cannot_tool_call_still_answers_complete_with_tool() -> Non
 
 def test_rotation_survives_a_fresh_client_per_request() -> None:
     """The bug this exists to prevent (2026-09-22): adhisthana.py's
-    _resolve_roles builds a NEW RotatingClient on every request, so an
+    resolve_roles builds a NEW RotatingClient on every request, so an
     instance counter reset to 1 each time and at share 0.1 the
     secondary's turn never came -- ten live pulses rotated zero times.
     It passed its first test because that test held ONE client across
@@ -226,7 +226,7 @@ def test_rotation_survives_a_fresh_client_per_request() -> None:
         def __init__(self, name): self.name = name
         def complete(self, *a, **k): return self.name
 
-    def one_request():                      # exactly what _resolve_roles does
+    def one_request():                      # exactly what resolve_roles does
         return RotatingClient(primary=Named("A"), secondary=Named("B"), share=0.1)
 
     served = [one_request().complete("s", "u") for _ in range(40)]

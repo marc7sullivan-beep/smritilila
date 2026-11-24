@@ -16,14 +16,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from smritilila.routes import bija as bija_routes
+from smritilila import itihasa
 from smritilila.worlds_registry import add_world, load_worlds_registry, set_world_description
 
 NOW = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
 
 
 def test_a_line_is_due_when_it_has_no_time_or_a_day_has_passed() -> None:
-    due = lambda at: bija_routes._describe_due(SimpleNamespace(described_at=at), NOW)
+    due = lambda at: itihasa._describe_due(SimpleNamespace(described_at=at), NOW)
     assert due(None) and due("") and due("not a time")                               # never drawn with a time, or unreadable: draw
     assert not due((NOW - timedelta(hours=23, minutes=59)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     assert due((NOW - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ"))
@@ -81,10 +81,10 @@ def _world(bhuvana: str | None, earth_entries: list[str], setting: str = "A town
 
 
 def _root(world, monkeypatch) -> str:
-    monkeypatch.setattr(bija_routes, "_chronicle_id", lambda w: "earth")
-    monkeypatch.setattr(bija_routes, "_stream_of", lambda w, eid: list(w.mems))
-    monkeypatch.setattr(bija_routes, "_age_tuples", lambda w: list(w.mems))
-    return bija_routes._root_of(world)
+    monkeypatch.setattr(itihasa, "chronicle_id", lambda w: "earth")
+    monkeypatch.setattr(itihasa, "stream_of", lambda w, eid: list(w.mems))
+    monkeypatch.setattr(itihasa, "_age_tuples", lambda w: list(w.mems))
+    return itihasa._root_of(world)
 
 
 def test_the_root_a_line_is_drawn_from_carries_the_ages_newest_entries(monkeypatch) -> None:
@@ -110,25 +110,25 @@ def _serve(monkeypatch, entry, calls):
     async def describe(w, roles):
         calls.append("described")
         return "It is July 1928 in Arkham."
-    monkeypatch.setattr(bija_routes.adhisthana, "_active_world_registry_entry", lambda: entry)
-    monkeypatch.setattr(bija_routes.adhisthana, "get_world", get_world)
-    monkeypatch.setattr(bija_routes.adhisthana, "_resolve_roles", lambda: object())
-    monkeypatch.setattr(bija_routes, "_describe", describe)
-    bija_routes._describe_attempted.clear()
+    monkeypatch.setattr(itihasa.adhisthana, "active_world_registry_entry", lambda: entry)
+    monkeypatch.setattr(itihasa.adhisthana, "get_world", get_world)
+    monkeypatch.setattr(itihasa.adhisthana, "resolve_roles", lambda: object())
+    monkeypatch.setattr(itihasa, "describe", describe)
+    itihasa._describe_attempted.clear()
 
 
 def test_a_server_draws_its_line_when_a_day_has_passed_and_not_before(monkeypatch) -> None:
     calls: list[str] = []
     fresh = SimpleNamespace(name="Ravenmoor", described_at=(NOW - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     _serve(monkeypatch, fresh, calls)
-    assert asyncio.run(bija_routes.describe_if_due(NOW)) is None and calls == []             # not due: the world is not even loaded
+    assert asyncio.run(itihasa.describe_if_due(NOW)) is None and calls == []             # not due: the world is not even loaded
     stale = SimpleNamespace(name="Ravenmoor", described_at=(NOW - timedelta(hours=25)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     _serve(monkeypatch, stale, calls)
-    assert asyncio.run(bija_routes.describe_if_due(NOW)) == "It is July 1928 in Arkham." and calls == ["loaded", "described"]
+    assert asyncio.run(itihasa.describe_if_due(NOW)) == "It is July 1928 in Arkham." and calls == ["loaded", "described"]
     unregistered = None
-    monkeypatch.setattr(bija_routes.adhisthana, "_active_world_registry_entry", lambda: unregistered)
+    monkeypatch.setattr(itihasa.adhisthana, "active_world_registry_entry", lambda: unregistered)
     calls.clear()
-    assert asyncio.run(bija_routes.describe_if_due(NOW)) is None and calls == []              # a world outside the registry has no line to keep
+    assert asyncio.run(itihasa.describe_if_due(NOW)) is None and calls == []              # a world outside the registry has no line to keep
 
 
 def test_a_draw_that_failed_is_tried_again_within_the_hour_not_at_the_next_look(monkeypatch) -> None:
@@ -140,14 +140,14 @@ def test_a_draw_that_failed_is_tried_again_within_the_hour_not_at_the_next_look(
     async def describe(w, roles):
         calls.append("described")
         return next(answers)
-    monkeypatch.setattr(bija_routes, "_describe", describe)
+    monkeypatch.setattr(itihasa, "describe", describe)
     t = [1000.0]
     clock = lambda: t[0]
-    assert asyncio.run(bija_routes.describe_if_due(NOW, clock)) is None and calls.count("described") == 1       # it failed
-    t[0] += bija_routes.DESCRIBE_CHECK_EVERY
-    assert asyncio.run(bija_routes.describe_if_due(NOW, clock)) is None and calls.count("described") == 1       # the next look: not yet
-    t[0] += bija_routes.DESCRIBE_RETRY_AFTER
-    assert asyncio.run(bija_routes.describe_if_due(NOW, clock)) == "It is autumn in the Flanaess." and calls.count("described") == 2
+    assert asyncio.run(itihasa.describe_if_due(NOW, clock)) is None and calls.count("described") == 1       # it failed
+    t[0] += itihasa.DESCRIBE_CHECK_EVERY
+    assert asyncio.run(itihasa.describe_if_due(NOW, clock)) is None and calls.count("described") == 1       # the next look: not yet
+    t[0] += itihasa.DESCRIBE_RETRY_AFTER
+    assert asyncio.run(itihasa.describe_if_due(NOW, clock)) == "It is autumn in the Flanaess." and calls.count("described") == 2
 
 
 def test_the_server_starts_the_daily_draw_and_stops_it(monkeypatch) -> None:
@@ -162,7 +162,7 @@ def test_the_server_starts_the_daily_draw_and_stops_it(monkeypatch) -> None:
         except asyncio.CancelledError:
             seen["cancelled"] = True
             raise
-    monkeypatch.setattr(bija_routes, "describe_daily", daily)
+    monkeypatch.setattr(itihasa, "describe_daily", daily)
     monkeypatch.setattr(adhisthana, "get_embedder", lambda: None)
     monkeypatch.setattr(adhisthana, "_recall_active_world", lambda: None)
 

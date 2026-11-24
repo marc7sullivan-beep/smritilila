@@ -114,7 +114,7 @@ async def test_absorb_refiles_every_tuple_and_drops_the_id(session_factory) -> N
             Record("r6", "said", "square", "Walk on.", 2, "p2", "walker2")]  # the gone one's line (Stonemarch's second Ostler)
     await store.commit(canon, [_mem(1, "walker", 1, "I walked."), _mem(2, "walker2", 2, "I walked on.", loc="walker2")], [a, b, nook], records=recs)
     out = await store.absorb("walker", "walker2")
-    assert out == {"tuples": 1, "filed": 1, "presence": 1, "records": 2, "contained": 1, "joined": 1, "field": 1, "speaker": 1, "dropped": 1}
+    assert out == {"tuples": 1, "filed": 1, "presence": 1, "records": 2, "contained": 1, "joined": 1, "field": 1, "speaker": 1, "pictures": 0, "dropped": 1}
     assert [(r.value, r.note) for r in await store.load_records() if r.kind == "said"] == [("Walk on.", "walker")]
     loaded = await store.load()
     assert "walker2" not in loaded.entities and loaded.entities["nook"].kosha == "walker"  # not left in nothing
@@ -180,7 +180,7 @@ def test_migrating_a_world_in_process_leaves_the_instruments_running() -> None:
     import uuid
 
     import asyncpg
-    from smritilila.adhisthana import _migrate_database
+    from smritilila.adhisthana import migrate_database
     for name in ("smritilila.sakshi", "smritilila.training_data"):
         logging.getLogger(name)
     base, _, _ = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1).rpartition("/")
@@ -194,7 +194,7 @@ def test_migrating_a_world_in_process_leaves_the_instruments_running() -> None:
             await conn.close()
     asyncio.run(run_sql(f'CREATE DATABASE "{scratch}"'))
     try:
-        _migrate_database(DATABASE_URL.rsplit("/", 1)[0] + "/" + scratch)
+        migrate_database(DATABASE_URL.rsplit("/", 1)[0] + "/" + scratch)
         assert not logging.getLogger("smritilila.sakshi").disabled
         assert not logging.getLogger("smritilila.training_data").disabled
     finally:
@@ -249,3 +249,27 @@ async def test_a_secret_record_round_trips_on_the_real_store(session_factory) ->
     canon.entities["book"] = Entity("book", ["a little book"], 0, "genesis")
     await store.commit(canon, [], [canon.entities["book"]], records=[Record("x1", "secret", "book", "anu", 5, "seed")])
     assert [(r.kind, r.entity_id, r.value) for r in await store.load_records()] == [("secret", "book", "anu")]
+
+
+@pytest.mark.asyncio
+async def test_pictures_are_kept_in_the_order_made_the_index_carries_no_bytes_a_merge_moves_them_and_a_clear_takes_them(session_factory) -> None:
+    """Ābhāsa (2026-11-11): memory/chitra.py kept in persistence/models.PictureRow -- insert-only, ordered by `seq`, bytes read only when one is shown."""
+    from smritilila.memory.chitra import Chitra
+    store = PostgresWorldStore(session_factory)
+    jpeg = b"\xff\xd8\xff\xe0 pretend this is a jpeg"
+    one = await store.save_chitra(Chitra("c1", "mara", None, 5, "a portrait of Mara", "fake-model", "image/jpeg", jpeg, "accepted by the player after 2 changes", ("hero", "friend")))
+    two = await store.save_chitra(Chitra("c2", None, "p9", 6, "a moment", "fake-model", "image/jpeg", jpeg + b" two"))
+    none = await store.save_chitra(Chitra("c3", "key", None, 7, "", "", note="judged to have no face"))
+    assert one.seq < two.seq < none.seq and one.made_at is not None and one.data is None and one.size == len(jpeg)
+    index = await store.load_chitra_index()
+    assert [c.id for c in index] == ["c1", "c2", "c3"] and [c.seq for c in index] == sorted(c.seq for c in index)
+    assert all(c.data is None for c in index) and index[0].size == len(jpeg) and index[0].seeds == ("hero", "friend") and index[0].entity_id == "mara" and index[0].pulse_id is None
+    assert index[1].entity_id is None and index[1].pulse_id == "p9" and not index[2].has_picture() and index[2].note == "judged to have no face"
+    assert await store.load_chitra_data("c1") == ("image/jpeg", jpeg) and await store.load_chitra_data("c2") == ("image/jpeg", jpeg + b" two")
+    assert await store.load_chitra_data("c3") is None and await store.load_chitra_data("nonesuch") is None   # a being with no face has no picture
+    # two entities found to be one: the picture of the gone one is of the one that stays
+    await store.save_chitra(Chitra("c4", "marla", None, 8, "a portrait of Marla", "fake-model", "image/jpeg", jpeg))
+    out = await store.absorb("mara", "marla")
+    assert out["pictures"] == 1 and [c.entity_id for c in await store.load_chitra_index() if c.id == "c4"] == ["mara"]
+    await store.clear()
+    assert await store.load_chitra_index() == [] and await store.load_chitra_data("c1") is None

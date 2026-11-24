@@ -20,7 +20,8 @@ from smritilila.graph.canon import Maya
 from smritilila.graph.entity import Entity
 from smritilila.memory.memory import Memory
 from smritilila.memory.record import Record
-from smritilila.persistence.models import EntityRow, MemoryRow, RecordRow, SessionConfigRow
+from smritilila.memory.chitra import Chitra
+from smritilila.persistence.models import EntityRow, MemoryRow, PictureRow, RecordRow, SessionConfigRow
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ async def upsert_entities(session: AsyncSession, entities: list[Entity]) -> None
     # same order and a cycle cannot form (2026-09-22). An ON CONFLICT DO
     # UPDATE takes an exclusive row lock, and two pulses commit
     # concurrently by design -- the player's and the deferred activation's
-    # (routes/spanda.py's background task). The order came from
+    # (spanda.py's background task). The order came from
     # `set(touched_ids)` in world_store.commit, and a Python set orders by
     # hash modulo its table size, so two DIFFERENT sets that share two
     # entities routinely iterate them oppositely: measured, 12 of 12
@@ -172,6 +173,9 @@ async def absorb_entity(session: AsyncSession, keep: str, gone: str) -> dict[str
     # Ostler and second Jaroo, Ravenmoor's grey-faced copy: 21 lines left naming no one)
     r = await session.execute(sql("update records set note = :keep where kind = 'said' and note = :gone"), {"keep": keep, "gone": gone})
     out["speaker"] = r.rowcount
+    # 2026-11-11: a picture of the gone one is of keep (a portrait made before the two were found to be one)
+    r = await session.execute(sql("update pictures set entity_id = :keep where entity_id = :gone"), {"keep": keep, "gone": gone})
+    out["pictures"] = r.rowcount
     r = await session.execute(sql("delete from entities where id = :gone"), {"gone": gone})
     out["dropped"] = r.rowcount
     return out
@@ -352,6 +356,7 @@ async def clear_all(session: AsyncSession) -> None:
     "start a genuinely new world" (routes/loka.py's POST /world/clear). memories
     references entities, so it goes first; a leftover session_config row
     must not survive to be misread as the NEXT world's."""
+    await session.execute(delete(PictureRow))
     await session.execute(delete(RecordRow))
     await session.execute(delete(MemoryRow))
     await session.execute(delete(EntityRow))
@@ -389,3 +394,34 @@ async def load_all_records(session: AsyncSession) -> list[Record]:
     declared_first = case((RecordRow.note == "declared", 0), else_=1)
     rows = (await session.execute(select(RecordRow).order_by(RecordRow.world_time, declared_first, RecordRow.id))).scalars().all()
     return [row_to_record(row) for row in rows]
+
+
+# -- Pictures (citra, 2026-11-11) -------------------------------------------
+
+
+def _chitra_of(row: PictureRow) -> Chitra:
+    """A picture as the index holds it: everything but its bytes (the column is deferred and is not touched here)."""
+    return Chitra(id=row.id, entity_id=row.entity_id, pulse_id=row.pulse_id, world_time=row.world_time, prompt=row.prompt, model=row.model,
+                  mime=row.mime, data=None, note=row.note, seeds=tuple(row.seeds or ()), seq=row.seq, made_at=row.made_at, size=row.size)
+
+
+async def save_chitra(session: AsyncSession, c: Chitra) -> Chitra:
+    """Keep a picture (insert-only) and return it as kept: its `seq` and `made_at` are the store's."""
+    row = PictureRow(id=c.id, entity_id=c.entity_id, pulse_id=c.pulse_id, world_time=c.world_time, prompt=c.prompt, model=c.model, mime=c.mime,
+                     data=c.data, size=len(c.data or b""), note=c.note, seeds=list(c.seeds))
+    session.add(row)
+    await session.flush()
+    await session.refresh(row, attribute_names=["seq", "made_at"])
+    return _chitra_of(row)
+
+
+async def load_chitra_index(session: AsyncSession) -> list[Chitra]:
+    """Every picture the world keeps, in the order kept, without their bytes."""
+    rows = (await session.execute(select(PictureRow).order_by(PictureRow.seq))).scalars().all()
+    return [_chitra_of(r) for r in rows]
+
+
+async def load_chitra_data(session: AsyncSession, picture_id: str) -> tuple[str, bytes] | None:
+    """One picture's (media type, bytes), or None if there is none by that id or it was never a picture."""
+    row = (await session.execute(select(PictureRow.mime, PictureRow.data).where(PictureRow.id == picture_id))).first()
+    return (row.mime, bytes(row.data)) if row is not None and row.data else None

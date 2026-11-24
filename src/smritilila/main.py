@@ -25,6 +25,7 @@ word, into modules named for what they are (each moved verbatim):
 - smritilila.routes.sthapati -- the master builder: the conversation in which a world's brief is
   made (2026-10-06), before /worlds/create and /genesis.
 - smritilila.routes.adhyaksa -- the overseer: the owner's admin screen (2026-10-06), the worlds and their guests.
+- smritilila.routes.abhasa -- a player's pictures (2026-11-11): which there are for them, and each one's image; they are made by smritilila.abhasa.
 And, before them: smritilila.itihasa (the age), smritilila.schemas (the API's
 shapes), smritilila.sangama (the rounds' bookkeeping), smritilila.pravrtti (the
 world's own draw). The paragraphs this docstring held about each part
@@ -55,11 +56,11 @@ from fastapi.responses import FileResponse
 from smritilila import adhisthana, dvara  # called through, so a test's patch there reaches every caller
 from smritilila.adhisthana import app
 from smritilila.dvara import (
-    _DECIDED_INSIDE, _OPEN_TO_ANY, _OWNER_ONLY, _OWNER_ONLY_PREFIX, _PLAYER_PATH, _WORLD_GODS_MAY,
-    _WORLD_GODS_MAY_PREFIX, _guest_online, _open_to_guests, _refuse,
+    DECIDED_INSIDE, OPEN_TO_ANY, OWNER_ONLY, OWNER_ONLY_PREFIX, PLAYER_PATH, WORLD_GODS_MAY,
+    WORLD_GODS_MAY_PREFIX, guest_online, open_to_guests, refuse,
 )
 from smritilila import users_registry
-from smritilila.routes import adhyaksa, bija, darshana, loka, pratistha, spanda, sthapati, upasthiti
+from smritilila.routes import abhasa as abhasa_routes, adhyaksa, bija, darshana, loka, pratistha, spanda, sthapati, upasthiti
 from smritilila.sakshi import code_version, log_event
 
 # The build stamp, resolved as the server's modules load rather than at
@@ -74,43 +75,43 @@ _WEB_INDEX = Path(__file__).parent / "web" / "index.html"
 
 @app.middleware("http")
 async def guest_gate(request: Request, call_next):
-    refused = dvara._host_refusal(request)  # first, for tunnel and local alike: the headers below are only as good as the Host they came in on
+    refused = dvara.host_refusal(request)  # first, for tunnel and local alike: the headers below are only as good as the Host they came in on
     if refused is not None:
         return refused
-    guest = dvara._guest(request)
+    guest = dvara.guest_of(request)
     if guest is None:
         return await call_next(request)
-    if guest and _guest_online(guest):  # named: an unnamed visitor ("") owns nothing, and is nobody to announce
-        entry = adhisthana._active_world_registry_entry()
+    if guest and guest_online(guest):  # named: an unnamed visitor ("") owns nothing, and is nobody to announce
+        entry = adhisthana.active_world_registry_entry()
         name = entry.name if entry is not None else "Smritilila"
         log_event("guest.online", guest=guest, world=name)
-        dvara._schedule_alert(f"{guest} is on {name}", f"{guest} came online in {name}.", getattr(entry, "url", None))
+        dvara.schedule_alert(f"{guest} is on {name}", f"{guest} came online in {name}.", getattr(entry, "url", None))
     path, method = request.url.path, request.method
-    if (method, path) in _DECIDED_INSIDE:
+    if (method, path) in DECIDED_INSIDE:
         return await call_next(request)
     if path.startswith("/builder/") and users_registry.may_build(guest):
         return await call_next(request)  # a registered user the owner has enabled for the builder (2026-10-06); the endpoints say whose job is whose
-    god = dvara._god_of_active(guest)
-    if god and ((method, path) in _WORLD_GODS_MAY or path.startswith(_WORLD_GODS_MAY_PREFIX)
+    god = dvara.god_of_active(guest)
+    if god and ((method, path) in WORLD_GODS_MAY or path.startswith(WORLD_GODS_MAY_PREFIX)
                 or ("/absorb/" in path and path.startswith("/entities/"))):
         return await call_next(request)  # the world's own god, shaping their world
-    if (method, path) in _OWNER_ONLY or path.startswith(_OWNER_ONLY_PREFIX) or ("/absorb/" in path and path.startswith("/entities/")):
+    if (method, path) in OWNER_ONLY or path.startswith(OWNER_ONLY_PREFIX) or ("/absorb/" in path and path.startswith("/entities/")):
         log_event("guest.refused", guest=guest, method=method, path=path, reason="owner_only")
-        return _refuse("only the world's owner may do that")
+        return refuse("only the world's owner may do that")
     if god:
         return await call_next(request)  # in their own world, as its owner is
-    if path not in _OPEN_TO_ANY:
-        entry = adhisthana._active_world_registry_entry()
-        if entry is None or not _open_to_guests(entry, guest):
+    if path not in OPEN_TO_ANY:
+        entry = adhisthana.active_world_registry_entry()
+        if entry is None or not open_to_guests(entry, guest):
             log_event("guest.refused", guest=guest, method=method, path=path, reason="world_closed")
-            return _refuse("this world is not open to guests right now")
-        m = _PLAYER_PATH.match(path)
+            return refuse("this world is not open to guests right now")
+        m = PLAYER_PATH.match(path)
         if m:
             world = await adhisthana.get_world()
             pid = m.group(1)
-            if pid in world.playable_entity_ids and not dvara._plays(world, guest, pid):
+            if pid in world.playable_entity_ids and not dvara.plays(world, guest, pid):
                 log_event("guest.refused", guest=guest, method=method, path=path, reason="not_their_character")
-                return _refuse("that character is not yours")
+                return refuse("that character is not yours")
     return await call_next(request)
 
 
@@ -137,3 +138,4 @@ app.include_router(upasthiti.router)
 app.include_router(darshana.router)
 app.include_router(sthapati.router)
 app.include_router(adhyaksa.router)
+app.include_router(abhasa_routes.router)
